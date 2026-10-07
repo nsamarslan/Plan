@@ -16,7 +16,20 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // A fixed debug key (committed on purpose) so every CI build can be
+    // installed over the previous one without uninstalling.
+    signingConfigs {
+        debug {
+            storeFile file('plan-debug.keystore')
+            storePassword 'android'
+            keyAlias 'plandebug'
+            keyPassword 'android'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

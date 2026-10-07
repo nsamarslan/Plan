@@ -136,7 +136,7 @@ export function Timeline({
                   {it.extra ? ' · sadece bu gün' : ''}
                 </span>
               </span>
-              {STATUS_LABEL[st] ? <span className={`status st-${st}`}>{STATUS_LABEL[st]}</span> : <span />}
+              {STATUS_LABEL[st] && (it.type.tracked || st === 'active') ? <span className={`status st-${st}`}>{STATUS_LABEL[st]}</span> : <span />}
             </button>
           </div>
         );

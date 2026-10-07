@@ -25,6 +25,7 @@ export interface FocusWindow {
   end: number;
   label: string;
   color: string;
+  art: ArtKey;
   silence: boolean;
   lock: boolean;
   allowed: string[];
@@ -118,6 +119,7 @@ export function buildFocusWindows(input: PlanInput): FocusWindow[] {
           end: msAt(date, it.end),
           label: it.label,
           color: it.type.color,
+          art: it.type.art,
           silence: true,
           lock: settings.lockAppsInDndBlocks,
           allowed: [...settings.allowedApps, ...it.type.allowedApps],
@@ -135,6 +137,7 @@ export function buildFocusWindows(input: PlanInput): FocusWindow[] {
         end: msAt(endDate, r.end),
         label: r.label,
         color: '#6366f1',
+        art: r.end <= r.start ? 'sleep' : 'free',
         silence: r.silence,
         lock: r.lockApps,
         allowed: [...settings.allowedApps],
@@ -155,6 +158,7 @@ export function activeFocus(windows: FocusWindow[], nowMs: number): FocusWindow 
     end: Math.max(...act.map((w) => w.end)),
     label: block.label,
     color: block.color,
+    art: block.art,
     silence: act.some((w) => w.silence),
     lock: act.some((w) => w.lock),
     allowed: [...new Set(act.flatMap((w) => w.allowed))],

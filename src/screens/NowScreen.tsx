@@ -19,6 +19,7 @@ import {
 import { dayStats } from '../model/stats';
 import { programDay } from '../model/tilt';
 import type { ArtKey, EffectiveStatus, ResolvedItem } from '../model/types';
+import { isNative } from '../native/plan';
 import { planInput } from '../services/scheduler';
 import { updateDay, updateType, useAppState } from '../store/store';
 
@@ -80,7 +81,7 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
           <Icon name={audio.muted ? 'mute' : 'sound'} />
         </button>
       )}
-      {document.fullscreenEnabled && (
+      {document.fullscreenEnabled && !isNative && window.innerWidth >= 700 && (
         <button
           className="icon-btn"
           aria-label="Tam ekran"
@@ -98,7 +99,7 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
   );
 
   return (
-    <div className="now" style={cssVars({ '--c': color })}>
+    <div className={`now ${current?.type.mode === 'tilt' && currentStatus === 'active' ? 'now--guide' : ''}`} style={cssVars({ '--c': color })}>
       <img className="now-art" src={artUrl(art)} alt="" />
       <div className="now-shade" />
       {top}
@@ -196,15 +197,15 @@ function Current({
     <>
       {active && type.mode === 'meditation' && <div className="breath breath-loop" />}
       <div className="now-main">
-        <div>
-          <span className="now-kicker">{active ? 'Şu an' : lateMin > START_GRACE_MIN ? 'Geciktin' : 'Başlama zamanı'}</span>
+        <div className="now-head">
+          <span className="now-kicker">{active ? 'Şu an' : lateMin > START_GRACE_MIN ? 'Sıra bunda' : 'Başlama zamanı'}</span>
           <h1 className="now-title">{item.label}</h1>
           <span className="now-time num">
             {fmt(item.start)} – {fmt(item.end)} · {fmtDuration(item.duration)}
           </span>
           {phaseLabel && <span className="pill" style={{ alignSelf: 'flex-start' }}>{phaseLabel}</span>}
         </div>
-        <Ring size={132} stroke={11} progress={active ? ringProgress : 1} color={active ? type.color : '#fbbf24'}>
+        <Ring size={124} stroke={10} progress={active ? ringProgress : 1} color={active ? type.color : '#fbbf24'}>
           <span className="ring-big num">{active ? fmtClock(ringSec) : `+${lateMin}`}</span>
           <span className="ring-small">{ringLabel}</span>
         </Ring>
@@ -233,7 +234,7 @@ function Current({
               <Icon name="check" /> Bitti
             </button>
             {!type.note && (
-              <button className="btn btn-ghost" style={{ minHeight: 64 }} onClick={() => setEditNote(true)} aria-label="Sıradaki notu">
+              <button className="btn btn-ghost" style={{ minHeight: 64, flex: 'none', width: 64 }} onClick={() => setEditNote(true)} aria-label="Sıradaki notu">
                 <Icon name="edit" />
               </button>
             )}
@@ -295,14 +296,14 @@ function Free({ next, items, today, now }: { next?: ResolvedItem; items: Resolve
   return (
     <>
       <div className="now-main">
-        <div>
+        <div className="now-head">
           <span className="now-kicker" style={{ color: '#94a3b8' }}>
             Serbest zaman
           </span>
           <h1 className="now-title">Mola</h1>
           <span className="now-time">Dinlen, su iç, hareket et.</span>
         </div>
-        <Ring size={132} stroke={11} progress={1 - Math.min(1, inSec / 3600)} color={next.type.color}>
+        <Ring size={124} stroke={10} progress={1 - Math.min(1, inSec / 3600)} color={next.type.color}>
           <span className="ring-big num">{fmtClock(inSec)}</span>
           <span className="ring-small">sonra</span>
         </Ring>

@@ -197,7 +197,11 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
   font-size: 0.78rem; font-weight: 700;
   background: rgba(255, 255, 255, 0.1);
 }
-.pill svg { width: 14px; height: 14px; }
+.pill { white-space: nowrap; }
+.pill svg { width: 14px; height: 14px; flex: none; }
+.btn svg { width: 22px; height: 22px; flex: none; }
+.note-line svg { flex: none; }
+.now-top .pill { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- sheet (bottom modal) ---------- */
 .scrim {
@@ -282,15 +286,32 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
   padding: 0 18px calc(26px + var(--safe-bottom));
   display: flex; flex-direction: column; gap: 16px;
 }
-@media (min-width: 900px) {
-  .now-body { margin-left: 5vw; margin-bottom: 4vh; }
-  .now-art { object-position: 70% 40%; }
+/* Portrait phones: the picture fills the top, the controls sit on a dark base. */
+@media (orientation: portrait) {
+  .now-art { height: 64%; object-position: 50% 42%; }
+  .now-shade {
+    background:
+      linear-gradient(180deg, rgba(8, 11, 15, 0.55) 0%, rgba(8, 11, 15, 0) 16%),
+      linear-gradient(180deg, rgba(8, 11, 15, 0) 30%, rgba(8, 11, 15, 0.88) 54%, #080b0f 64%);
+  }
+  .now { background: #080b0f; }
 }
+/* Wide screens: picture full-bleed, controls on a dark panel to the left. */
+@media (orientation: landscape) {
+  .now-body { margin-left: max(18px, 5vw); margin-bottom: 4vh; }
+  .now-art { object-position: 50% 40%; }
+  .now-shade {
+    background:
+      linear-gradient(180deg, rgba(8, 11, 15, 0.5) 0%, rgba(8, 11, 15, 0) 18%),
+      linear-gradient(90deg, rgba(8, 11, 15, 0.94) 0%, rgba(8, 11, 15, 0.82) 38%, rgba(8, 11, 15, 0) 70%);
+  }
+}
+.now--guide .now-art { opacity: 0.22; }
 .now-kicker {
   font-size: 0.8rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--c);
 }
-.now-title { font-size: clamp(2.4rem, 11vw, 4rem); font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+.now-title { font-size: clamp(2rem, 9.5vw, 3.8rem); font-weight: 800; letter-spacing: -0.035em; line-height: 1.02; overflow-wrap: anywhere; }
 .now-time { color: var(--ink-2); font-weight: 600; }
 .now-step {
   background: rgba(255, 255, 255, 0.07);
@@ -300,8 +321,8 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
   font-size: 1.05rem;
 }
 .now-step b { display: block; font-size: 0.72rem; letter-spacing: 0.12em; color: var(--c); margin-bottom: 2px; }
-.now-main { display: flex; align-items: center; gap: 18px; }
-.now-main > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.now-main { display: flex; align-items: center; gap: 16px; }
+.now-head { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .now-actions { display: flex; flex-direction: column; gap: 10px; }
 .now-actions .row .btn { flex: 1; }
 .now-next {
