@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#070b1f"/>
+      <stop offset="0.5" stop-color="#1b2152"/>
+      <stop offset="0.62" stop-color="#3a3478"/>
+    </linearGradient>
+    <radialGradient id="moonGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#c7c9ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c7c9ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2a63"/>
+      <stop offset="1" stop-color="#090c22"/>
+    </linearGradient>
+    <mask id="crescent">
+      <circle cx="400" cy="260" r="74" fill="#fff"/>
+      <circle cx="432" cy="236" r="66" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="800" height="800" fill="url(#sky)"/>
+  <g fill="#fff">
+    <circle cx="120" cy="90" r="2"/><circle cx="210" cy="160" r="1.5"/><circle cx="300" cy="70" r="2.2"/>
+    <circle cx="520" cy="120" r="1.6"/><circle cx="610" cy="60" r="2.4"/><circle cx="690" cy="180" r="1.6"/>
+    <circle cx="260" cy="250" r="1.4"/><circle cx="560" cy="300" r="1.8"/><circle cx="150" cy="320" r="1.6"/>
+    <circle cx="660" cy="350" r="1.2"/><circle cx="80" cy="220" r="1.4"/><circle cx="740" cy="110" r="1.8"/>
+    <circle cx="350" cy="150" r="1.2"/><circle cx="470" cy="190" r="1.1"/>
+  </g>
+  <g fill="#fff" opacity="0.9">
+    <path d="M580 210 l4 12 l12 4 l-12 4 l-4 12 l-4 -12 l-12 -4 l12 -4z"/>
+    <path d="M220 120 l3 9 l9 3 l-9 3 l-3 9 l-3 -9 l-9 -3 l9 -3z"/>
+  </g>
+  <circle cx="400" cy="260" r="200" fill="url(#moonGlow)"/>
+  <rect width="800" height="800" fill="#f3f0ff" mask="url(#crescent)"/>
+  <path d="M0 470 L120 380 L190 430 L290 330 L380 420 L450 370 L560 450 L650 360 L800 470 V520 H0Z" fill="#232456"/>
+  <path d="M0 500 L90 450 L170 490 L260 430 L360 490 L470 440 L580 500 L700 440 L800 490 V520 H0Z" fill="#171a42"/>
+  <rect y="520" width="800" height="280" fill="url(#lake)"/>
+  <g stroke="#cfd0ff" stroke-linecap="round" opacity="0.45">
+    <line x1="350" y1="560" x2="450" y2="560" stroke-width="4"/>
+    <line x1="370" y1="590" x2="430" y2="590" stroke-width="3"/>
+    <line x1="385" y1="616" x2="415" y2="616" stroke-width="2"/>
+    <line x1="140" y1="600" x2="210" y2="600" stroke-width="2" opacity="0.5"/>
+    <line x1="600" y1="640" x2="680" y2="640" stroke-width="2" opacity="0.5"/>
+  </g>
+</svg>

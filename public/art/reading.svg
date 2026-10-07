@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17110c"/>
+      <stop offset="1" stop-color="#2a1d12"/>
+    </linearGradient>
+    <radialGradient id="lampGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffcf73" stop-opacity="0.65"/>
+      <stop offset="0.5" stop-color="#f5a742" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#f5a742" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd98a" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ffd98a" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f1d3a"/>
+      <stop offset="1" stop-color="#28396a"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#e9dcc4"/>
+      <stop offset="0.5" stop-color="#fff6e3"/>
+      <stop offset="1" stop-color="#efe2c9"/>
+    </linearGradient>
+    <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a3a22"/>
+      <stop offset="1" stop-color="#2a190d"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#wall)"/>
+  <rect x="470" y="70" width="230" height="270" rx="10" fill="url(#win)" stroke="#3b2a1b" stroke-width="14"/>
+  <line x1="585" y1="70" x2="585" y2="340" stroke="#3b2a1b" stroke-width="8"/>
+  <line x1="470" y1="200" x2="700" y2="200" stroke="#3b2a1b" stroke-width="8"/>
+  <circle cx="640" cy="130" r="26" fill="#f6efd6"/>
+  <circle cx="652" cy="122" r="22" fill="#14223f"/>
+  <g fill="#fff" opacity="0.8">
+    <circle cx="510" cy="110" r="1.8"/><circle cx="540" cy="160" r="1.4"/><circle cx="620" cy="250" r="1.6"/>
+    <circle cx="660" cy="300" r="1.4"/><circle cx="520" cy="280" r="1.6"/>
+  </g>
+  <circle cx="300" cy="240" r="300" fill="url(#lampGlow)"/>
+  <path d="M250 200 L170 470 H470 L350 200Z" fill="url(#cone)"/>
+  <path d="M248 130 h104 l26 78 h-156z" fill="#e0943a"/>
+  <path d="M248 130 h104 l26 78 h-156z" fill="#fff" opacity="0.12"/>
+  <rect x="294" y="208" width="12" height="18" fill="#3b2a1b"/>
+  <ellipse cx="300" cy="212" rx="64" ry="8" fill="#ffe2a0" opacity="0.8"/>
+  <path d="M0 470 H800 V800 H0Z" fill="url(#desk)"/>
+  <rect y="470" width="800" height="6" fill="#7a5233"/>
+  <g>
+    <path d="M232 452 C280 420 350 418 400 440 C450 418 520 420 568 452 L560 470 C510 448 450 450 400 470 C350 450 290 448 240 470Z" fill="#7a2f22"/>
+    <path d="M248 438 C292 408 356 404 400 426 L400 458 C356 438 292 440 248 462Z" fill="url(#page)"/>
+    <path d="M552 438 C508 408 444 404 400 426 L400 458 C444 438 508 440 552 462Z" fill="url(#page)"/>
+    <g stroke="#b9a785" stroke-width="2" stroke-linecap="round" opacity="0.7">
+      <path d="M272 432 C310 414 350 412 384 424"/>
+      <path d="M272 442 C310 424 350 422 384 434"/>
+      <path d="M416 424 C450 412 490 414 528 432"/>
+      <path d="M416 434 C450 422 490 424 528 442"/>
+      <path d="M416 444 C450 432 490 434 520 450"/>
+    </g>
+    <line x1="400" y1="426" x2="400" y2="460" stroke="#c9b48c" stroke-width="2"/>
+  </g>
+  <g>
+    <rect x="586" y="404" width="56" height="64" rx="8" fill="#c8553d"/>
+    <path d="M642 418 c22 0 22 34 0 34" fill="none" stroke="#c8553d" stroke-width="8"/>
+    <ellipse cx="614" cy="406" rx="28" ry="6" fill="#5b2a1e"/>
+    <g fill="none" stroke="#f3e2c6" stroke-width="3" stroke-linecap="round" opacity="0.55">
+      <path d="M604 392 c-8 -14 8 -20 0 -34"/>
+      <path d="M622 388 c-8 -14 8 -20 0 -34"/>
+    </g>
+  </g>
+  <g>
+    <rect x="160" y="430" width="70" height="16" rx="3" fill="#2f5d62"/>
+    <rect x="166" y="414" width="62" height="16" rx="3" fill="#a3562a"/>
+    <rect x="156" y="398" width="66" height="16" rx="3" fill="#d9a441"/>
+  </g>
+</svg>
