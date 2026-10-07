@@ -44,12 +44,12 @@ class FocusAudioEngine {
   }
 
   start(settings: AudioSettings, blockLabel: string) {
-    this.settings = settings;
-    this.blockLabel = blockLabel;
     if (this.running) {
-      this.applyVolumes();
+      this.update(settings, blockLabel);
       return;
     }
+    this.settings = settings;
+    this.blockLabel = blockLabel;
     this.running = true;
     this.ensureCtx();
     this.applyVolumes();
@@ -248,8 +248,6 @@ export const focusAudio = new FocusAudioEngine();
 
 /** Speak one phrase immediately with the given settings (for the "Dinle" button). */
 export async function previewCue(settings: AudioSettings, label: string) {
-  const wasRunning = focusAudio.isRunning;
-  if (!wasRunning) focusAudio.update(settings, label);
   focusAudio.update(settings, label);
   await focusAudio.cueNow();
 }
