@@ -121,6 +121,13 @@ public class FocusService extends Service {
                 stopSelf();
                 return;
             }
+            // Nothing can be opened while the screen is off: check rarely.
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            if (!pm.isInteractive()) {
+                hideOverlay();
+                handler.postDelayed(this, 3_000);
+                return;
+            }
             if (!f.label.equals(shownLabel)) {
                 ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIF_ID, buildNotification(f));
             }
