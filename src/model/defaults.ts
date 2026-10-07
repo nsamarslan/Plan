@@ -1,0 +1,267 @@
+import { dateKey, type Minutes } from '../lib/time';
+import type { AudioSettings, BlockType, Settings, TemplateItem } from './types';
+
+const hm = (h: number, m = 0): Minutes => h * 60 + m;
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+
+export const WEIGHT_TIPS = [
+  'Deadlift kilidinde geriye yaslanma — tepede kalçayı öne itip dur.',
+  'Omuz preste bel kavisle geriye kaçıyorsa: kaburga aşağı, karın gergin, gerekirse oturarak bas.',
+  'Barfikste sarkarken kaburgalar açılmasın — hafif "hollow" pozisyonda çek.',
+  'Bel ekstansiyonu başına en az iki kat kalça ve karın işi koy.',
+  'Squat kurulumunda barı alırken kaburgayı indir, karnı sık, sonra otur.',
+];
+
+export const DAILY_HABITS = [
+  'Kalçana asılma — ağırlık ayağın ortasında, kalça hafif aktif.',
+  'Kaburgaları cebine indir: bir nefes ver, alt kaburgalar aşağı-içeri.',
+  'Oturma kemiklerinin üstünde otur. 45 dakikada bir kalk.',
+  'Düz tabanlı ayakkabı giy, kalın topuk eğimi artırır.',
+  'Yatakta dirsek üstünde yüzükoyun uzanma.',
+];
+
+export const DEFAULT_TYPES: BlockType[] = [
+  {
+    id: 'tilt',
+    name: 'Pelvis Egzersizi',
+    color: '#06b6d4',
+    art: 'tilt',
+    firstStep: 'Minderi ser, sırtüstü uzan. Ekrandaki ilk adımı yap.',
+    mode: 'tilt',
+    tracked: true,
+    dnd: false,
+    notify: true,
+    focusAudio: false,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'walk',
+    name: 'Yürüyüş',
+    color: '#84cc16',
+    art: 'walk',
+    firstStep: 'Ayakkabını giy, su al, kapıdan çık.',
+    mode: 'walk',
+    tracked: true,
+    dnd: false,
+    notify: true,
+    focusAudio: false,
+    allowedApps: [],
+    note: '',
+    tips: ['Yürürken kaburga aşağı, kalça hafif aktif.', 'Yarı sürede bildirim gelince geri dön.'],
+  },
+  {
+    id: 'weights',
+    name: 'Ağırlık Antrenmanı',
+    color: '#f97316',
+    art: 'weights',
+    firstStep: 'Antrenman kıyafetini giy, suyu doldur, ilk hareketin ağırlığını hazırla.',
+    mode: 'timer',
+    tracked: true,
+    dnd: false,
+    notify: true,
+    focusAudio: false,
+    allowedApps: [],
+    note: '',
+    tips: WEIGHT_TIPS,
+  },
+  {
+    id: 'reading',
+    name: 'Okuma',
+    color: '#f5b301',
+    art: 'reading',
+    firstStep: 'Kitabı aç, kaldığın sayfadan başla. Telefonu ters çevir.',
+    mode: 'timer',
+    tracked: true,
+    dnd: true,
+    notify: true,
+    focusAudio: false,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'meditation',
+    name: 'Meditasyon',
+    color: '#8b5cf6',
+    art: 'meditation',
+    firstStep: 'Otur, gözlerini kapat, üç derin nefes al.',
+    mode: 'meditation',
+    tracked: true,
+    dnd: true,
+    notify: true,
+    focusAudio: false,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'dsa',
+    name: 'DSA',
+    color: '#3b82f6',
+    art: 'dsa',
+    firstStep: 'Sıradaki soruyu aç, problemi kendi cümlenle bir satırda yaz.',
+    mode: 'pomodoro',
+    tracked: true,
+    dnd: true,
+    notify: true,
+    focusAudio: true,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'design',
+    name: 'System Design',
+    color: '#d946ef',
+    art: 'design',
+    firstStep: 'Bugünkü konunun başlığını yaz, 5 dakika gereksinimleri listele.',
+    mode: 'pomodoro',
+    tracked: true,
+    dnd: true,
+    notify: true,
+    focusAudio: true,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'ai',
+    name: 'AI Satış Uygulaması',
+    color: '#10b981',
+    art: 'ai',
+    firstStep: 'Dünkü notuna bak, tek bir küçük görev seç ve hemen başla.',
+    mode: 'pomodoro',
+    tracked: true,
+    dnd: true,
+    notify: true,
+    focusAudio: true,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'review',
+    name: 'Yarını Planla',
+    color: '#f43f5e',
+    art: 'review',
+    firstStep: 'Bugün sekmesinde "Yarın"a geç, saatleri kontrol et.',
+    mode: 'timer',
+    tracked: true,
+    dnd: false,
+    notify: true,
+    focusAudio: false,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'meal',
+    name: 'Yemek',
+    color: '#a8a29e',
+    art: 'meal',
+    firstStep: 'Ekrandan uzaklaş, sadece ye.',
+    mode: 'timer',
+    tracked: false,
+    dnd: false,
+    notify: true,
+    focusAudio: false,
+    allowedApps: [],
+    note: '',
+  },
+];
+
+let seq = 0;
+const tid = () => `t${++seq}`;
+
+const item = (
+  typeId: string,
+  start: Minutes,
+  duration: number,
+  extra: Partial<TemplateItem> = {},
+): TemplateItem => ({ id: tid(), typeId, start, duration, days: EVERY_DAY, ...extra });
+
+/** Default day: wake 07:00, sleep 22:30 (8.5 h). Weights Mon/Tue/Thu/Fri. */
+export function defaultTemplate(): TemplateItem[] {
+  seq = 0;
+  return [
+    item('meditation', hm(7, 15), 30),
+    item('tilt', hm(7, 45), 15, { minimal: true }),
+    item('walk', hm(8, 0), 45, { label: 'Sabah Yürüyüşü', minimal: true }),
+    item('meal', hm(8, 45), 45, { label: 'Kahvaltı', minimal: true }),
+    item('dsa', hm(9, 30), 90, { label: 'DSA 1', minimal: true, minimalDuration: 60 }),
+    item('dsa', hm(11, 15), 90, { label: 'DSA 2' }),
+    item('meal', hm(12, 45), 45, { label: 'Öğle Yemeği', minimal: true }),
+    item('reading', hm(13, 30), 60, { label: 'Okuma 1' }),
+    item('design', hm(14, 45), 60),
+    item('ai', hm(16, 0), 60),
+    item('weights', hm(17, 15), 45, { days: [1, 2, 4, 5] }),
+    item('walk', hm(18, 15), 45, { label: 'Akşam Yürüyüşü' }),
+    item('meal', hm(19, 0), 60, { label: 'Akşam Yemeği', minimal: true }),
+    item('reading', hm(20, 30), 60, { label: 'Okuma 2' }),
+    item('review', hm(21, 45), 10, { minimal: true }),
+  ];
+}
+
+export const DEFAULT_PHRASES = [
+  "They're staring at you again.",
+  'Clear your mind.',
+  'Where is your attention right now?',
+  'Come back to the task.',
+  'Breathe out. Ribs down.',
+  'Notice your posture.',
+  'One thing at a time.',
+  'You are not your thoughts.',
+  'Watch the urge. Do not follow it.',
+  'Eyes on the work.',
+  'Slow down. Be here.',
+  'This moment. This task.',
+  'Relax your jaw. Drop your shoulders.',
+  'Notice the pull. Let it pass.',
+  'Finish this one thing.',
+  'Awareness is your power.',
+  'Nobody is coming. Do it now.',
+  'Still on {block}? Stay with it.',
+  'Silence the noise. Return to {block}.',
+  'You chose this. Keep going.',
+];
+
+export function defaultAudio(): AudioSettings {
+  return {
+    voiceEnabled: true,
+    musicEnabled: true,
+    when: 'focusBlocks',
+    minSec: 120,
+    maxSec: 300,
+    phrases: DEFAULT_PHRASES.map((text, i) => ({ id: `p${i + 1}`, text, enabled: true })),
+    clipIds: [],
+    musicIds: [],
+    musicVolume: 0.5,
+    voiceVolume: 1,
+    lang: 'en-US',
+    voiceName: '',
+    rate: 0.9,
+    pitch: 0.8,
+  };
+}
+
+export function defaultSettings(): Settings {
+  return {
+    wake: hm(7),
+    sleep: hm(22, 30),
+    preWarnMin: 5,
+    remindEveryMin: 3,
+    remindCount: 3,
+    dndRanges: [
+      {
+        id: 'night',
+        label: 'Gece',
+        start: hm(22, 30),
+        end: hm(7),
+        days: EVERY_DAY,
+        silence: true,
+        lockApps: true,
+        enabled: true,
+      },
+    ],
+    allowedApps: [],
+    lockAppsInDndBlocks: true,
+    showStreak: false,
+    tiltStartDate: dateKey(new Date()),
+    audio: defaultAudio(),
+  };
+}
