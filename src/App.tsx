@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFocusAudioController } from './audio/controller';
 import { Icon, Toasts, type IconName } from './components/ui';
 import { useNow } from './hooks/useNow';
 import { dateKey } from './lib/time';
-import { nowState, resolveDay } from './model/schedule';
+import { nowStateAround } from './model/schedule';
 import { NowScreen } from './screens/NowScreen';
 import { PlanScreen } from './screens/PlanScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -26,14 +26,23 @@ export function App() {
   const now = useNow(1000);
   const s = useAppState();
   const today = dateKey(new Date(now));
-  const items = useMemo(() => resolveDay(today, s.template, s.types, s.days[today]), [today, s.template, s.types, s.days]);
-  const { current, currentStatus } = nowState(items, today, now);
+  const { current, currentStatus, currentDate } = nowStateAround(today, s.template, s.types, s.days, now);
   // Audio keeps playing while you move between tabs.
-  const audio = useFocusAudioController(s.settings, current, currentStatus, today);
+  const audio = useFocusAudioController(s.settings, current, currentStatus, currentDate);
+
+  // Opening the app from a block notification always lands on "Şimdi".
+  useEffect(() => {
+    const go = () => setTab('now');
+    window.addEventListener('planOpenNow', go);
+    return () => window.removeEventListener('planOpenNow', go);
+  }, []);
 
   return (
     <div className="shell">
-      {tab === 'now' && <NowScreen now={now} audio={audio} onOpenToday={() => setTab('today')} />}
+      {/* Kept mounted (just hidden) so a running pelvis routine or timer survives a tab switch. */}
+      <div hidden={tab !== 'now'}>
+        <NowScreen now={now} audio={audio} onOpenToday={() => setTab('today')} />
+      </div>
       {tab === 'today' && <TodayScreen now={now} />}
       {tab === 'plan' && <PlanScreen />}
       {tab === 'stats' && <StatsScreen now={now} />}

@@ -1,4 +1,4 @@
-import { msAt, weekday, type DateKey, type Minutes, MIN_MS } from '../lib/time';
+import { addDays, dateKey, DAY_MIN, daysBetween, minutesOfDay, msAt, weekday, type DateKey, type Minutes } from '../lib/time';
 import type {
   BlockType,
   DayDoc,
@@ -14,6 +14,9 @@ export function emptyDay(date: DateKey): DayDoc {
 }
 
 const PENDING: ItemLog = { status: 'pending' };
+
+const validStart = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const validDuration = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 5;
 
 /** Template + this day's overrides → the concrete, time-sorted plan for the day. */
 export function resolveDay(
@@ -34,9 +37,11 @@ export function resolveDay(
     if (ov.removed) return;
     // Minimal mode hides non-essential items, unless already started/finished today.
     if (minimal && !extra && !t.minimal && !doc.logs[t.id]) return;
-    const baseDuration = minimal && t.minimalDuration ? t.minimalDuration : t.duration;
-    const start = ov.start ?? t.start;
-    const duration = ov.duration ?? baseDuration;
+    const baseDuration = minimal && validDuration(t.minimalDuration) ? t.minimalDuration! : t.duration;
+    const start = validStart(ov.start) ? ov.start! : t.start;
+    const duration = validDuration(ov.duration) ? ov.duration! : baseDuration;
+    // Never let one broken record (e.g. a cleared time input) break the whole day.
+    if (!validStart(start) || !validDuration(duration)) return;
     out.push({
       id: t.id,
       typeId: t.typeId,
@@ -52,7 +57,9 @@ export function resolveDay(
     });
   };
 
-  for (const t of template) if (t.days.includes(wd)) add(t, false);
+  // A past day keeps the plan it had (`tpl`), so later template edits
+  // don't rewrite history.
+  for (const t of doc.tpl ?? template) if (Array.isArray(t.days) && t.days.includes(wd)) add(t, false);
   for (const t of doc.extras) add(t, true);
   out.sort((a, b) => a.start - b.start || a.end - b.end);
   return out;
@@ -92,6 +99,31 @@ export function nowState(items: ResolvedItem[], date: DateKey, nowMs: number): N
     (it) => it !== current && effectiveStatus(it, date, nowMs) === 'upcoming',
   );
   return { current, currentStatus, next };
+}
+
+export interface NowStateAt extends NowState {
+  /** The calendar day `current` belongs to (yesterday for a block running past midnight). */
+  currentDate: DateKey;
+}
+
+/** Like nowState, but a block from yesterday that runs past midnight still counts. */
+export function nowStateAround(
+  today: DateKey,
+  template: TemplateItem[],
+  types: Record<string, BlockType>,
+  days: Record<DateKey, DayDoc>,
+  nowMs: number,
+): NowStateAt {
+  const items = resolveDay(today, template, types, days[today]);
+  const st = nowState(items, today, nowMs);
+  if (st.currentStatus === 'active') return { ...st, currentDate: today };
+  const y = addDays(today, -1);
+  const carry = resolveDay(y, template, types, days[y]).filter((i) => i.end > DAY_MIN);
+  const prev = nowState(carry, y, nowMs);
+  if (prev.current && (!st.current || prev.currentStatus === 'active')) {
+    return { current: prev.current, currentStatus: prev.currentStatus, next: st.next, currentDate: y };
+  }
+  return { ...st, currentDate: today };
 }
 
 function setOverride(day: DayDoc, id: string, patch: ItemOverride): DayDoc {
@@ -134,8 +166,40 @@ export function moveItem(
   return next;
 }
 
-export function setDuration(day: DayDoc, id: string, duration: number): DayDoc {
-  return setOverride(day, id, { duration: Math.max(5, Math.round(duration)) });
+const isOpen = (i: ResolvedItem) => i.log.status !== 'done' && i.log.status !== 'skipped' && i.log.status !== 'active';
+
+/** Push the open blocks that come after `target` (in plan order) so none starts
+ *  before `prevEnd`; stops at the first gap that absorbs the shift. */
+function pushAfter(day: DayDoc, items: ResolvedItem[], target: ResolvedItem, prevEnd: number): DayDoc {
+  let next = day;
+  const after = items
+    .filter((i) => i.id !== target.id && isOpen(i) && (i.start > target.start || (i.start === target.start && i.end >= target.end)))
+    .sort((a, b) => a.start - b.start);
+  for (const it of after) {
+    if (it.start >= prevEnd) break;
+    next = setOverride(next, it.id, { start: prevEnd });
+    prevEnd += it.duration;
+  }
+  return next;
+}
+
+/**
+ * Snooze / late start: the block moves to `newStart` and everything that was
+ * planned after it moves along, so the block keeps its place in the order.
+ */
+export function postponeItem(day: DayDoc, items: ResolvedItem[], id: string, newStart: Minutes): DayDoc {
+  const target = items.find((i) => i.id === id);
+  if (!target) return day;
+  const start = Math.round(newStart);
+  return pushAfter(setOverride(day, id, { start }), items, target, start + target.duration);
+}
+
+/** Longer blocks push the following ones, the same way moving does. */
+export function setDuration(day: DayDoc, items: ResolvedItem[], id: string, duration: number): DayDoc {
+  const d = Math.max(5, Math.round(duration));
+  const target = items.find((i) => i.id === id);
+  const next = setOverride(day, id, { duration: d });
+  return target ? pushAfter(next, items, target, target.start + d) : next;
 }
 
 function setLog(day: DayDoc, id: string, log: ItemLog): DayDoc {
@@ -155,10 +219,16 @@ export function startItem(
 ): DayDoc {
   const it = items.find((i) => i.id === id);
   if (!it) return day;
-  const nowMin = (nowMs - msAt(day.date, 0)) / MIN_MS;
+  // Wall-clock minutes (DST-safe); a start after midnight counts past 24:00.
+  const now = new Date(nowMs);
+  const nowMin = daysBetween(day.date, dateKey(now)) * DAY_MIN + minutesOfDay(now);
   let next = day;
   if (Math.abs(nowMin - it.start) > START_GRACE_MIN) {
-    next = moveItem(day, items, id, Math.floor(nowMin));
+    next = postponeItem(day, items, id, Math.floor(nowMin));
+  }
+  // One thing at a time: a block still running ends when another one starts.
+  for (const o of items) {
+    if (o.id !== id && o.log.status === 'active') next = finishItem(next, o.id, nowMs);
   }
   return setLog(next, id, { status: 'active', startedAt: nowMs });
 }

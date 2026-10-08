@@ -170,7 +170,14 @@ function ItemSheet({ item, items, date, onClose }: { item: ResolvedItem; items: 
 
   const saveToTemplate = () => {
     if (!tpl) return;
-    updateTemplate((list) => list.map((t) => (t.id === item.id ? { ...t, start: item.start, duration: item.duration, dnd: item.dnd } : t)));
+    // Only what was changed for this day goes into the template; on a bad
+    // (minimal) day the shorter duration is not a real change.
+    const ov = s.days[date]?.overrides[item.id] ?? {};
+    const patch: Partial<typeof tpl> = {};
+    if (ov.start !== undefined) patch.start = Math.min(ov.start, 24 * 60 - 5);
+    if (ov.duration !== undefined) patch.duration = ov.duration;
+    if (ov.dnd !== undefined) patch.dnd = ov.dnd;
+    updateTemplate((list) => list.map((t) => (t.id === item.id ? { ...t, ...patch } : t)));
     upd((d) => clearOverride(d, item.id));
   };
 
@@ -191,7 +198,7 @@ function ItemSheet({ item, items, date, onClose }: { item: ResolvedItem; items: 
         <span>Süre</span>
         <Stepper
           value={item.duration}
-          onChange={(v) => upd((d) => setDuration(d, item.id, Math.max(5, v)))}
+          onChange={(v) => upd((d) => setDuration(d, items, item.id, Math.max(5, v)))}
           render={<div className="input num" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{fmtDuration(item.duration)}</div>}
         />
       </div>

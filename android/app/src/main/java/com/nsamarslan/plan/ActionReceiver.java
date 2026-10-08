@@ -22,20 +22,28 @@ public class ActionReceiver extends BroadcastReceiver {
         if (type == null || key == null) return;
         Store.pushAction(c, type, key);
         Store.ack(c, key);
-        NotificationManagerCompat.from(c).cancel(Notifier.idFor(key, "start"));
-        NotificationManagerCompat.from(c).cancel(Notifier.idFor(key, "end"));
-        if (!"start".equals(type)) dropWindows(c, key);
+        NotificationManagerCompat nm = NotificationManagerCompat.from(c);
+        nm.cancel(Notifier.idFor(key, "start"));
+        nm.cancel(Notifier.idFor(key, "end"));
+        nm.cancel(Notifier.idFor(key, "cue"));
+        if (!"start".equals(type)) {
+            Store.close(c, key);
+            dropItem(c, key);
+        }
         Scheduler.run(c);
     }
 
-    /** A skipped or finished block should not keep the phone locked. */
-    private static void dropWindows(Context c, String key) {
-        JSONArray in = Store.windows(c);
+    /** A skipped or finished block: no more cues, end notice or focus lock for it. */
+    private static void dropItem(Context c, String key) {
+        Store.setSchedule(c, without(Store.events(c), key), without(Store.windows(c), key));
+    }
+
+    private static JSONArray without(JSONArray in, String key) {
         JSONArray out = new JSONArray();
         for (int i = 0; i < in.length(); i++) {
-            JSONObject w = in.optJSONObject(i);
-            if (w != null && !key.equals(w.optString("itemKey"))) out.put(w);
+            JSONObject o = in.optJSONObject(i);
+            if (o != null && !key.equals(o.optString("itemKey"))) out.put(o);
         }
-        Store.setSchedule(c, Store.events(c), out);
+        return out;
     }
 }

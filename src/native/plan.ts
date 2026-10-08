@@ -50,6 +50,7 @@ interface PlanNativePlugin {
   speak(opts: { text: string; lang: string; rate: number; pitch: number; volume: number; voice?: string }): Promise<void>;
   stopSpeaking(): Promise<void>;
   listVoices(): Promise<{ voices: VoiceInfo[] }>;
+  saveFile(opts: { name: string; text: string }): Promise<{ path: string }>;
 }
 
 export const isNative = Capacitor.isNativePlatform();

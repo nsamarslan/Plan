@@ -3,13 +3,13 @@ import { setAudioMuted } from '../audio/controller';
 import { TiltGuide } from '../components/TiltGuide';
 import { artUrl, cssVars, Icon, Ring, Sheet } from '../components/ui';
 import { useWakeLock } from '../hooks/useWakeLock';
-import { addDays, dateKey, fmt, fmtClock, fmtDuration, minutesOfDay, msAt, MIN_MS } from '../lib/time';
+import { addDays, dateKey, DAY_MIN, daysBetween, fmt, fmtClock, fmtDuration, minutesOfDay, msAt, MIN_MS } from '../lib/time';
 import { DAILY_HABITS } from '../model/defaults';
 import { activeFocus, buildFocusWindows } from '../model/notify';
 import {
   finishItem,
-  moveItem,
-  nowState,
+  nowStateAround,
+  postponeItem,
   pomodoroPhases,
   resolveDay,
   skipItem,
@@ -33,7 +33,9 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
   const s = useAppState();
   const today = dateKey(new Date(now));
   const items = useMemo(() => resolveDay(today, s.template, s.types, s.days[today]), [today, s.template, s.types, s.days]);
-  const { current, currentStatus, next } = nowState(items, today, now);
+  // A block from yesterday that runs past midnight still shows up here.
+  const { current, currentStatus, next, currentDate } = nowStateAround(today, s.template, s.types, s.days, now);
+  const currentItems = currentDate === today ? items : resolveDay(currentDate, s.template, s.types, s.days[currentDate]);
   const nowMin = minutesOfDay(new Date(now));
   const stats = dayStats(today, items, now);
   const minuteKey = Math.floor(now / MIN_MS);
@@ -42,8 +44,15 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
     [minuteKey, s],
   );
   useWakeLock(!!current);
+  // The note sheet stays bound to the block type it was opened for, even if the
+  // block ends while typing.
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const noteType = noteFor ? s.types[noteFor] : undefined;
 
-  const asleep = !current && (nowMin < s.settings.wake || nowMin >= s.settings.sleep);
+  const { wake, sleep } = s.settings;
+  // Bedtime may be after midnight (e.g. 00:30), then the night wraps around.
+  const night = sleep > wake ? nowMin < wake || nowMin >= sleep : nowMin >= sleep && nowMin < wake;
+  const asleep = !current && night;
   const dayOver = !current && !next && !asleep;
   const tomorrowFirst = useMemo(() => {
     const date = nowMin >= s.settings.wake ? addDays(today, 1) : today;
@@ -105,13 +114,29 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
       {top}
       <div className="now-body">
         {current ? (
-          <Current item={current} status={currentStatus!} items={items} today={today} now={now} next={next} />
+          <Current
+            item={current}
+            status={currentStatus!}
+            items={currentItems}
+            today={currentDate}
+            now={now}
+            next={next}
+            onEditNote={setNoteFor}
+          />
         ) : asleep || dayOver ? (
           <Sleep dayOver={dayOver} sleepAt={s.settings.sleep} first={tomorrowFirst} />
         ) : (
           <Free next={next} items={items} today={today} now={now} />
         )}
       </div>
+      {noteType && (
+        <NoteSheet
+          title={`${noteType.name} — sıradaki`}
+          value={noteType.note}
+          onClose={() => setNoteFor(null)}
+          onSave={(v) => updateType(noteType.id, (t) => ({ ...t, note: v }))}
+        />
+      )}
     </div>
   );
 }
@@ -135,6 +160,7 @@ function Current({
   today,
   now,
   next,
+  onEditNote,
 }: {
   item: ResolvedItem;
   status: EffectiveStatus;
@@ -142,9 +168,9 @@ function Current({
   today: string;
   now: number;
   next?: ResolvedItem;
+  onEditNote: (typeId: string) => void;
 }) {
   const s = useAppState();
-  const [editNote, setEditNote] = useState(false);
   const startMs = msAt(today, item.start);
   const endMs = msAt(today, item.end);
   const leftSec = (endMs - now) / 1000;
@@ -157,8 +183,10 @@ function Current({
   const finish = () => updateDay(today, (d) => finishItem(d, item.id, Date.now()));
   const skip = () => updateDay(today, (d) => skipItem(d, item.id));
   const later = () => {
-    const nowMin = minutesOfDay(new Date());
-    updateDay(today, (d) => moveItem(d, items, item.id, Math.ceil(nowMin) + 15));
+    // Minutes on this block's own day (past 24:00 if it started yesterday).
+    const t = new Date();
+    const nowMin = daysBetween(today, dateKey(t)) * DAY_MIN + minutesOfDay(t);
+    updateDay(today, (d) => postponeItem(d, items, item.id, Math.ceil(nowMin) + 15));
   };
 
   if (active && type.mode === 'tilt') {
@@ -218,8 +246,8 @@ function Current({
         </p>
       )}
       {active && tip && <p className="now-step">{tip}</p>}
-      {(type.note || editNote) && !editNote && (
-        <button className="note-line" style={{ background: 'none', border: 0, padding: 0, textAlign: 'left' }} onClick={() => setEditNote(true)}>
+      {type.note && (
+        <button className="note-line" style={{ background: 'none', border: 0, padding: 0, textAlign: 'left' }} onClick={() => onEditNote(item.typeId)}>
           <Icon name="edit" size={16} />
           <span>
             Sıradaki: <b>{type.note}</b>
@@ -234,7 +262,7 @@ function Current({
               <Icon name="check" /> Bitti
             </button>
             {!type.note && (
-              <button className="btn btn-ghost" style={{ minHeight: 64, flex: 'none', width: 64 }} onClick={() => setEditNote(true)} aria-label="Sıradaki notu">
+              <button className="btn btn-ghost" style={{ minHeight: 64, flex: 'none', width: 64 }} onClick={() => onEditNote(item.typeId)} aria-label="Sıradaki notu">
                 <Icon name="edit" />
               </button>
             )}
@@ -257,14 +285,6 @@ function Current({
         )}
       </div>
       <NextLine next={next} />
-      {editNote && (
-        <NoteSheet
-          title={`${type.name} — sıradaki`}
-          value={type.note}
-          onClose={() => setEditNote(false)}
-          onSave={(v) => updateType(type.id, (t) => ({ ...t, note: v }))}
-        />
-      )}
     </>
   );
 }

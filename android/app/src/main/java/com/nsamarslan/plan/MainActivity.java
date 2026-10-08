@@ -26,21 +26,38 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onPause() {
+        super.onPause();
+        // Shown over the lock screen for an alarm only; don't stay that way.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(false);
+            setTurnScreenOn(false);
+        }
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         // Re-arm alarms and focus state whenever the app comes to the front.
         new Thread(() -> Scheduler.run(this)).start();
     }
 
-    /** A block's full-screen notification opens the "Şimdi" screen over the lock screen. */
+    /**
+     * A block's notification opens the "Şimdi" screen, over the lock screen.
+     * Any other launch puts the normal lock-screen behaviour back.
+     */
     @SuppressWarnings("deprecation")
     private void showOverLockScreen(Intent intent) {
-        if (intent == null || !intent.getBooleanExtra(EXTRA_FROM_ALARM, false)) return;
+        boolean fromAlarm = intent != null && intent.getBooleanExtra(EXTRA_FROM_ALARM, false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true);
-            setTurnScreenOn(true);
-        } else {
+            setShowWhenLocked(fromAlarm);
+            setTurnScreenOn(fromAlarm);
+        } else if (fromAlarm) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         }
+        // Warm start: the page may be on another tab. (Cold start opens on "Şimdi" anyway.)
+        if (fromAlarm && getBridge() != null) getBridge().triggerWindowJSEvent("planOpenNow");
     }
 }

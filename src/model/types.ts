@@ -85,6 +85,8 @@ export interface DayDoc {
   overrides: Record<string, ItemOverride>;
   extras: TemplateItem[];
   logs: Record<string, ItemLog>;
+  /** Frozen copy of the weekly template for a past day (see freezePastDays). */
+  tpl?: TemplateItem[];
 }
 
 export interface DndRange {

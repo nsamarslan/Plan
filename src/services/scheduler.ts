@@ -4,9 +4,11 @@ import { buildEvents, buildFocusWindows, type FocusWindow, type NotifyEvent, typ
 import { finishItem, resolveDay, skipItem, startItem } from '../model/schedule';
 import { isNative, PlanNative, type NativeAction } from '../native/plan';
 import { getState, getDay, subscribe, updateDay } from '../store/store';
+import { pullNow } from '../store/sync';
 import { toast } from './toast';
 
-const DAYS_AHEAD = 7;
+// Two weeks: the phone keeps notifying even if the app isn't opened for a while.
+const DAYS_AHEAD = 14;
 
 export function planInput(nowMs = Date.now()): PlanInput {
   const s = getState();
@@ -27,6 +29,8 @@ let lastFired = Date.now();
 let lastSig = '';
 
 async function push() {
+  // Apply notification-button taps first, so a stale plan never overrides them.
+  await consumeNative();
   const input = planInput();
   const events = buildEvents(input);
   const windows = buildFocusWindows(input);
@@ -69,8 +73,16 @@ function fireWebEvents() {
 export function applyNativeAction(a: NativeAction) {
   if (!a.itemKey) return;
   const [date, id] = a.itemKey.split('|');
+  if (!date || !id) return;
   const s = getState();
   const items = resolveDay(date, s.template, s.types, getDay(date));
+  const it = items.find((i) => i.id === id);
+  if (!it) return;
+  // A button tapped on an old notification must not undo what was done in the app since.
+  const st = it.log.status;
+  if (a.type === 'start' && st !== 'pending') return;
+  if (a.type === 'skip' && st !== 'pending') return;
+  if (a.type === 'done' && (st === 'done' || st === 'skipped')) return;
   updateDay(date, (d) => {
     if (a.type === 'start') return startItem(d, items, id, a.at);
     if (a.type === 'skip') return skipItem(d, id);
@@ -79,14 +91,18 @@ export function applyNativeAction(a: NativeAction) {
   });
 }
 
-async function consumeNative() {
-  if (!isNative) return;
-  try {
-    const { actions } = await PlanNative.consumeActions();
-    actions.forEach(applyNativeAction);
-  } catch (e) {
-    console.warn('consumeActions failed', e);
-  }
+let consuming: Promise<void> | null = null;
+
+function consumeNative(): Promise<void> {
+  if (!isNative) return Promise.resolve();
+  // One at a time: push() and the resume handler can both ask.
+  consuming ??= PlanNative.consumeActions()
+    .then(({ actions }) => actions.forEach(applyNativeAction))
+    .catch((e) => console.warn('consumeActions failed', e))
+    .finally(() => {
+      consuming = null;
+    });
+  return consuming;
 }
 
 export function startScheduler() {
@@ -96,11 +112,13 @@ export function startScheduler() {
     timer = setTimeout(() => void push(), 600);
   };
   subscribe(soon);
-  void consumeNative().then(push);
+  void push();
   // Re-plan every minute so events roll forward past midnight.
   setInterval(() => void push(), 60_000);
   if (!isNative) setInterval(fireWebEvents, 5_000);
   if (isNative) {
-    void App.addListener('resume', () => void consumeNative().then(push));
+    // Pull the other device's changes before applying notification taps, so a
+    // tap on yesterday's copy of a day doesn't overwrite newer edits.
+    void App.addListener('resume', () => void pullNow().then(push));
   }
 }

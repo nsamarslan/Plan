@@ -140,7 +140,8 @@ public class FocusService extends Service {
 
     private void updateForeground(long now) {
         UsageStatsManager usm = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
-        long from = lastQuery == 0 ? now - 5 * 60_000 : lastQuery - 2_000;
+        // First look back far: the user may have been in an app long before the lock began.
+        long from = lastQuery == 0 ? now - 24 * 60 * 60_000L : lastQuery - 2_000;
         UsageEvents events = usm.queryEvents(from, now);
         UsageEvents.Event e = new UsageEvents.Event();
         while (events.hasNextEvent()) {

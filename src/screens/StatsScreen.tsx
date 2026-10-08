@@ -15,13 +15,23 @@ export function StatsScreen({ now }: { now: number }) {
   const [picked, setPicked] = useState<string | null>(null);
   const since = firstDay();
 
+  // Recompute once a minute, not on every clock tick.
+  const minuteNow = Math.floor(now / 60_000) * 60_000;
   const week = useMemo(
-    () => rangeStats({ end: today, days: 7, nowMs: now, template: s.template, types: s.types, dayDocs: s.days }),
-    [today, now, s],
+    () => rangeStats({ end: today, days: 7, nowMs: minuteNow, template: s.template, types: s.types, dayDocs: s.days }),
+    [today, minuteNow, s],
   );
   const span = useMemo(
-    () => rangeStats({ end: today, days: Number(range), nowMs: now, template: s.template, types: s.types, dayDocs: s.days, since }),
-    [today, now, s, range, since],
+    () => rangeStats({ end: today, days: Number(range), nowMs: minuteNow, template: s.template, types: s.types, dayDocs: s.days, since }),
+    [today, minuteNow, s, range, since],
+  );
+  // The streak is not limited by the 7/30-day selector below.
+  const streakDays = useMemo(
+    () =>
+      s.settings.showStreak
+        ? rangeStats({ end: today, days: 366, nowMs: minuteNow, template: s.template, types: s.types, dayDocs: s.days, since }).days
+        : [],
+    [today, minuteNow, s, since],
   );
   const t = week.days[week.days.length - 1];
   const judged = span.days.reduce(
@@ -41,10 +51,10 @@ export function StatsScreen({ now }: { now: number }) {
         continue;
       }
       const items = resolveDay(date, s.template, s.types, s.days[date]);
-      out.push(items.some((it) => it.type.mode === 'tilt' && effectiveStatus(it, date, now) === 'done'));
+      out.push(items.some((it) => it.type.mode === 'tilt' && effectiveStatus(it, date, minuteNow) === 'done'));
     }
     return out;
-  }, [s, today, now]);
+  }, [s, today, minuteNow]);
   const tiltColor = s.types.tilt?.color ?? '#06b6d4';
 
   return (
@@ -63,7 +73,7 @@ export function StatsScreen({ now }: { now: number }) {
           <span>Son {range} gün</span>
         </div>
         <div className="kpi">
-          <b className="num">{s.settings.showStreak ? streak(span.days) : fmtDuration(judged.doneMin)}</b>
+          <b className="num">{s.settings.showStreak ? streak(streakDays) : fmtDuration(judged.doneMin)}</b>
           <span>{s.settings.showStreak ? 'Seri (gün)' : 'Odak süresi'}</span>
         </div>
       </div>

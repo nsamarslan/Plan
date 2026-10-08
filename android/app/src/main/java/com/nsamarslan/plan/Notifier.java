@@ -23,6 +23,7 @@ final class Notifier {
     private static final String CH_BLOCKS = "blocks_v1";
     private static final String CH_BLOCKS_DND = "blocks_dnd_v1";
     private static final String CH_CUES = "cues_v1";
+    private static final String CH_CUES_DND = "cues_dnd_v1";
     /** pre/start/remind of one block share an id so they replace each other. */
     private static final long STALE_MS = 2 * 60_000;
 
@@ -56,9 +57,11 @@ final class Notifier {
             if (dnd) ch.setBypassDnd(true);
             nm.createNotificationChannel(ch);
         }
-        if (nm.getNotificationChannel(CH_CUES) == null) {
-            NotificationChannel ch = new NotificationChannel(CH_CUES, "Mola ve dönüş", NotificationManager.IMPORTANCE_DEFAULT);
-            ch.setDescription("Pomodoro molası, yürüyüşte dönüş zamanı");
+        // Same trick as above: bypass is only honoured if set while we have DND access.
+        String cues = dnd ? CH_CUES_DND : CH_CUES;
+        if (nm.getNotificationChannel(cues) == null) {
+            NotificationChannel ch = new NotificationChannel(cues, "Mola ve dönüş", NotificationManager.IMPORTANCE_DEFAULT);
+            ch.setDescription("Pomodoro molası, yürüyüşte dönüş zamanı, 5 dk önce uyarısı");
             ch.enableVibration(true);
             if (dnd) ch.setBypassDnd(true);
             nm.createNotificationChannel(ch);
@@ -75,6 +78,12 @@ final class Notifier {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return CH_BLOCKS;
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         return nm.getNotificationChannel(CH_BLOCKS_DND) != null ? CH_BLOCKS_DND : CH_BLOCKS;
+    }
+
+    private static String cuesChannel(Context c) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return CH_CUES;
+        NotificationManager nm = c.getSystemService(NotificationManager.class);
+        return nm.getNotificationChannel(CH_CUES_DND) != null ? CH_CUES_DND : CH_CUES;
     }
 
     static PendingIntent openApp(Context c, int req) {
@@ -102,12 +111,13 @@ final class Notifier {
         String key = e.optString("itemKey");
         long at = e.optLong("at");
         boolean beforeStart = "pre".equals(kind) || "start".equals(kind) || "remind".equals(kind);
+        if (Store.isClosed(c, key)) return;
         if (beforeStart && Store.isAcked(c, key)) return;
         if (!"start".equals(kind) && now - at > STALE_MS) return;
 
         ensureChannels(c);
         boolean loud = beforeStart && !"pre".equals(kind);
-        String channel = ("cue".equals(kind) || "pre".equals(kind)) ? CH_CUES : blocksChannel(c);
+        String channel = ("cue".equals(kind) || "pre".equals(kind)) ? cuesChannel(c) : blocksChannel(c);
         int color;
         try {
             color = Color.parseColor(e.optString("color", "#3b82f6"));
@@ -128,8 +138,9 @@ final class Notifier {
             .setShowWhen(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(loud ? NotificationCompat.PRIORITY_MAX : NotificationCompat.PRIORITY_DEFAULT)
-            // Alarm category passes our focus-mode policy, which allows alarms.
-            .setCategory(loud ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
+            // Alarm category passes our focus-mode policy, which allows alarms; a
+            // break or turnaround cue must get through focus mode too.
+            .setCategory(loud || "cue".equals(kind) ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(openApp(c, id));
         if (pic != null) {
             b.setLargeIcon(pic);

@@ -52,7 +52,8 @@ export function buildEvents(input: PlanInput): NotifyEvent[] {
   const { today, nowMs, days, template, types, dayDocs, settings } = input;
   const out: NotifyEvent[] = [];
 
-  for (let d = 0; d < days; d++) {
+  // Start at yesterday: a block running past midnight still has cues and an end.
+  for (let d = -1; d < days; d++) {
     const date = addDays(today, d);
     const items = resolveDay(date, template, types, dayDocs[date]);
     for (const it of items) {
@@ -73,7 +74,9 @@ export function buildEvents(input: PlanInput): NotifyEvent[] {
         }
         push('start', startMs, `Şimdi: ${it.label}`, first, true);
         for (let k = 1; k <= settings.remindCount; k++) {
-          push('remind', startMs + k * settings.remindEveryMin * MIN_MS, `Hâlâ bekliyor: ${it.label}`, `Tek adım: ${first}`, false, k);
+          const at = startMs + k * settings.remindEveryMin * MIN_MS;
+          if (at >= endMs) break; // the block is over; the end notice takes it from here
+          push('remind', at, `Hâlâ bekliyor: ${it.label}`, `Tek adım: ${first}`, false, k);
         }
       }
 
@@ -99,6 +102,22 @@ export function buildEvents(input: PlanInput): NotifyEvent[] {
     }
   }
 
+  // Android only knows the days we send. If the app isn't opened for that long,
+  // say so before the plan runs out instead of going silent.
+  if (days > 3) {
+    out.push({
+      id: 'refresh|plan',
+      at: msAt(addDays(today, days - 2), 20 * 60),
+      kind: 'cue',
+      itemKey: 'refresh|plan',
+      title: 'Planı yenile',
+      body: 'Plan 2 gün sonra bitiyor. Uygulamayı bir kez aç, yeni günler eklensin.',
+      color: '#64748b',
+      art: 'review',
+      fullScreen: false,
+    });
+  }
+
   return out.filter((e) => e.at > nowMs - 30_000).sort((a, b) => a.at - b.at);
 }
 
@@ -108,7 +127,8 @@ export function buildFocusWindows(input: PlanInput): FocusWindow[] {
 
   for (let d = -1; d < days; d++) {
     const date = addDays(today, d);
-    if (d >= 0) {
+    {
+      // Yesterday too: a block running past midnight keeps its focus window.
       const items = resolveDay(date, template, types, dayDocs[date]);
       for (const it of items) {
         if (!it.dnd) continue;

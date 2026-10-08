@@ -15,6 +15,12 @@ class FocusAudioEngine {
   private voiceGain: GainNode | null = null;
   private music: AudioBufferSourceNode | null = null;
   private musicTrack = 0;
+  /** Bumped on every stop; a load that finishes under an old generation is dropped. */
+  private musicGen = 0;
+  private clip: AudioBufferSourceNode | null = null;
+  private voiceGen = 0;
+  /** Files that are not on this device (ids sync, files don't). */
+  private missing = new Set<string>();
   private cueTimer: ReturnType<typeof setTimeout> | undefined;
   private buffers = new Map<string, AudioBuffer>();
   private settings: AudioSettings | null = null;
@@ -66,6 +72,7 @@ class FocusAudioEngine {
     this.applyVolumes();
     const musicChanged =
       !prev || prev.musicEnabled !== settings.musicEnabled || prev.musicIds.join() !== settings.musicIds.join();
+    if (musicChanged || prev?.clipIds.join() !== settings.clipIds.join()) this.missing.clear();
     if (musicChanged) {
       this.stopMusic();
       if (settings.musicEnabled && settings.musicIds.length) void this.playMusic();
@@ -82,6 +89,18 @@ class FocusAudioEngine {
     this.running = false;
     clearTimeout(this.cueTimer);
     this.stopMusic();
+    this.stopVoice();
+  }
+
+  private stopVoice() {
+    this.voiceGen++;
+    const c = this.clip;
+    this.clip = null;
+    try {
+      c?.stop();
+    } catch {
+      /* not started yet or already stopped */
+    }
     if (isNative) void PlanNative.stopSpeaking().catch(() => {});
     else window.speechSynthesis?.cancel();
   }
@@ -97,13 +116,17 @@ class FocusAudioEngine {
     const cached = this.buffers.get(id);
     if (cached) return cached;
     const file = await getAudio(id);
-    if (!file) return null;
+    if (!file) {
+      this.missing.add(id);
+      return null;
+    }
     const ctx = this.ensureCtx();
     try {
       const buf = await ctx.decodeAudioData(await file.blob.arrayBuffer());
       this.buffers.set(id, buf);
       return buf;
     } catch {
+      this.missing.add(id);
       return null;
     }
   }
@@ -134,13 +157,20 @@ class FocusAudioEngine {
   private async playMusic() {
     const s = this.settings;
     if (!s || !this.running) return;
+    const gen = this.musicGen;
     const ids = s.musicIds;
-    const id = ids[this.musicTrack % ids.length];
-    const buf = await this.loadBuffer(id);
-    if (!this.running || !buf) return;
+    // Skip files that aren't on this device instead of going silent.
+    let buf: AudioBuffer | null = null;
+    for (let tries = 0; tries < ids.length && !buf; tries++) {
+      const id = ids[this.musicTrack % ids.length];
+      buf = this.missing.has(id) ? null : await this.loadBuffer(id);
+      if (gen !== this.musicGen || !this.running) return; // stopped or changed meanwhile
+      if (!buf) this.musicTrack++;
+    }
+    if (!buf) return;
     const ctx = this.ensureCtx();
     const src = ctx.createBufferSource();
-    const single = ids.length === 1;
+    const single = ids.filter((id) => !this.missing.has(id)).length <= 1;
     if (single) {
       src.buffer = buf.duration <= SHORT_CLIP_SEC ? this.bakeLoop(buf) : buf;
       src.loop = true;
@@ -158,6 +188,7 @@ class FocusAudioEngine {
   }
 
   private stopMusic() {
+    this.musicGen++;
     const m = this.music;
     this.music = null;
     try {
@@ -207,15 +238,22 @@ class FocusAudioEngine {
   }
 
   private async playClip(id: string): Promise<void> {
+    const gen = this.voiceGen;
     const buf = await this.loadBuffer(id);
-    if (!buf) return;
+    if (!buf || gen !== this.voiceGen) return;
     const ctx = this.ensureCtx();
     await new Promise<void>((resolve) => {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(this.voiceGain!);
-      src.onended = () => resolve();
+      src.onended = () => {
+        if (this.clip === src) this.clip = null;
+        resolve();
+      };
+      this.clip = src;
       src.start(ctx.currentTime + 0.3);
+      // Never wait forever (e.g. the context got suspended).
+      setTimeout(resolve, (buf.duration + 2) * 1000);
     });
   }
 

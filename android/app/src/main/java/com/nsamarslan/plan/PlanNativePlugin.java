@@ -46,6 +46,16 @@ public class PlanNativePlugin extends Plugin {
     public void setSchedule(PluginCall call) {
         JSArray events = call.getArray("events", new JSArray());
         JSArray windows = call.getArray("windows", new JSArray());
+        // Blocks the app still lists as waiting to start: earlier button taps for
+        // them were already applied (actions are consumed before every push).
+        Set<String> pending = new HashSet<>();
+        for (int i = 0; i < events.length(); i++) {
+            org.json.JSONObject e = events.optJSONObject(i);
+            if (e == null) continue;
+            String kind = e.optString("kind");
+            if ("pre".equals(kind) || "start".equals(kind) || "remind".equals(kind)) pending.add(e.optString("itemKey"));
+        }
+        Store.reopen(getContext(), pending);
         Store.setSchedule(getContext(), events, windows);
         new Thread(() -> {
             Scheduler.run(getContext());
@@ -97,6 +107,16 @@ public class PlanNativePlugin extends Plugin {
 
     @PermissionCallback
     private void notificationsResult(PluginCall call) {
+        // Permanently denied: Android shows no prompt any more, so open the settings page.
+        if (getPermissionState("notifications") != PermissionState.GRANTED) {
+            Intent i = Permissions.settingsIntent(getContext(), "notifications");
+            if (i != null) {
+                try {
+                    getContext().startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                } catch (RuntimeException ignored) {
+                }
+            }
+        }
         call.resolve();
     }
 
@@ -169,6 +189,45 @@ public class PlanNativePlugin extends Plugin {
     public void stopSpeaking(PluginCall call) {
         speaker.stop();
         call.resolve();
+    }
+
+    /** Backup export: WebView can't download a blob, so write the file natively. */
+    @PluginMethod
+    public void saveFile(PluginCall call) {
+        String name = call.getString("name", "plan-yedek.json");
+        String text = call.getString("text", "");
+        byte[] bytes = text.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            JSObject r = new JSObject();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                android.content.ContentResolver cr = getContext().getContentResolver();
+                android.content.ContentValues v = new android.content.ContentValues();
+                v.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name);
+                v.put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json");
+                v.put(android.provider.MediaStore.Downloads.IS_PENDING, 1);
+                android.net.Uri uri = cr.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                if (uri == null) throw new java.io.IOException("MediaStore insert failed");
+                try (java.io.OutputStream os = cr.openOutputStream(uri)) {
+                    if (os == null) throw new java.io.IOException("no output stream");
+                    os.write(bytes);
+                }
+                v.clear();
+                v.put(android.provider.MediaStore.Downloads.IS_PENDING, 0);
+                cr.update(uri, v, null, null);
+                r.put("path", "İndirilenler/" + name);
+            } else {
+                java.io.File dir = getContext().getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS);
+                if (dir == null) throw new java.io.IOException("no storage");
+                java.io.File f = new java.io.File(dir, name);
+                try (java.io.FileOutputStream os = new java.io.FileOutputStream(f)) {
+                    os.write(bytes);
+                }
+                r.put("path", f.getAbsolutePath());
+            }
+            call.resolve(r);
+        } catch (Exception e) {
+            call.reject("Kaydedilemedi: " + e.getMessage());
+        }
     }
 
     @PluginMethod

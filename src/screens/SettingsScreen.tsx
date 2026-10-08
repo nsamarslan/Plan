@@ -1,13 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppPicker } from '../components/AppPicker';
-import { Chips, HoldButton, Icon, Switch, TimeInput } from '../components/ui';
+import { Chips, HoldButton, Icon, NumberInput, Switch, TimeInput } from '../components/ui';
 import { dateKey, fmt, WEEK_ORDER, WEEKDAYS_SHORT } from '../lib/time';
 import { uid } from '../model/schedule';
 import type { DndRange, Settings } from '../model/types';
 import { BUILTIN_ALLOWED, isNative, PlanNative, type PermissionName, type PermissionState } from '../native/plan';
 import { toast } from '../services/toast';
-import { allDocKeys, applyRemote, getDoc, resetAll, updateSettings, useAppState } from '../store/store';
-import { fullSync, initSync, signIn, signOut, signUp, useSyncStatus } from '../store/sync';
+import { allDocKeys, applyRemote, getDoc, updateSettings, useAppState } from '../store/store';
+import {
+  clearSupabaseConfig,
+  fullSync,
+  getSupabaseConfig,
+  initSync,
+  resetLocal,
+  setSupabaseConfig,
+  signIn,
+  signOut,
+  signUp,
+  useSyncStatus,
+} from '../store/sync';
 import { AudioSettingsCard } from './AudioSettings';
 
 const dayOptions = WEEK_ORDER.map((d) => ({ value: d, label: WEEKDAYS_SHORT[d] }));
@@ -61,16 +72,16 @@ function NotifyCard() {
       <div className="grid2">
         <label className="field">
           <span>Önceden uyar (dk)</span>
-          <input className="input num" type="number" min={0} max={30} value={s.preWarnMin} onChange={(e) => set({ preWarnMin: Math.max(0, Number(e.target.value) || 0) })} />
+          <NumberInput min={0} max={30} value={s.preWarnMin} onChange={(v) => v !== undefined && set({ preWarnMin: v })} />
         </label>
         <label className="field">
           <span>Başlamazsan tekrar (dk)</span>
-          <input className="input num" type="number" min={1} max={30} value={s.remindEveryMin} onChange={(e) => set({ remindEveryMin: Math.max(1, Number(e.target.value) || 1) })} />
+          <NumberInput min={1} max={30} value={s.remindEveryMin} onChange={(v) => v !== undefined && set({ remindEveryMin: v })} />
         </label>
       </div>
       <label className="field">
         <span>Kaç kez tekrar etsin</span>
-        <input className="input num" type="number" min={0} max={10} value={s.remindCount} onChange={(e) => set({ remindCount: Math.max(0, Number(e.target.value) || 0) })} />
+        <NumberInput min={0} max={10} value={s.remindCount} onChange={(v) => v !== undefined && set({ remindCount: v })} />
       </label>
       {!isNative && perm !== 'granted' && typeof Notification !== 'undefined' && (
         <button className="btn btn-primary" onClick={() => void Notification.requestPermission().then(setPerm)}>
@@ -230,9 +241,9 @@ function SyncCard() {
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [msg, setMsg] = useState('');
-  const [url, setUrl] = useState(s.supabaseUrl ?? '');
-  const [key, setKey] = useState(s.supabaseKey ?? '');
-  const envConfigured = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+  const cfg = getSupabaseConfig();
+  const [url, setUrl] = useState(cfg?.url ?? '');
+  const [key, setKey] = useState(cfg?.key ?? '');
 
   return (
     <div className="card">
@@ -250,8 +261,9 @@ function SyncCard() {
           <button
             className="btn btn-primary"
             onClick={() => {
-              set({ supabaseUrl: url.trim(), supabaseKey: key.trim() });
-              setTimeout(() => initSync(), 50);
+              // Stored on this device only, so it can't overwrite the other device's settings.
+              setSupabaseConfig(url, key);
+              initSync();
             }}
           >
             Kaydet
@@ -295,11 +307,12 @@ function SyncCard() {
           </div>
         </>
       )}
-      {st.configured && !envConfigured && (
+      {st.configured && !cfg?.fromBuild && (
         <button
           className="btn btn-ghost btn-sm"
           onClick={() => {
-            set({ supabaseUrl: undefined, supabaseKey: undefined });
+            clearSupabaseConfig();
+            if (s.supabaseUrl || s.supabaseKey) set({ supabaseUrl: undefined, supabaseKey: undefined });
             location.reload();
           }}
         >
@@ -312,21 +325,39 @@ function SyncCard() {
 
 function DataCard() {
   const file = useRef<HTMLInputElement>(null);
-  const exportData = () => {
+  const exportData = async () => {
     const docs = Object.fromEntries(allDocKeys().map((k) => [k, getDoc(k)]));
-    const blob = new Blob([JSON.stringify({ app: 'plan', v: 1, docs }, null, 2)], { type: 'application/json' });
+    const text = JSON.stringify({ app: 'plan', v: 1, docs }, null, 2);
+    const name = `plan-yedek-${dateKey(new Date())}.json`;
+    if (isNative) {
+      // The Android WebView can't download a blob link; save it natively.
+      try {
+        const { path } = await PlanNative.saveFile({ name, text });
+        toast({ title: 'Yedek kaydedildi', body: path });
+      } catch (e) {
+        toast({ title: 'Yedek kaydedilemedi', body: String(e), color: '#f87171' });
+      }
+      return;
+    }
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `plan-yedek-${dateKey(new Date())}.json`;
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = name;
     a.click();
   };
   const importData = async (f: File | undefined) => {
     if (!f) return;
     try {
-      const json = JSON.parse(await f.text()) as { docs: Record<string, { data: unknown; updatedAt: number }> };
+      const json = JSON.parse(await f.text()) as { docs?: Record<string, { data?: unknown } | null> };
+      if (!json || typeof json.docs !== 'object' || !json.docs) throw new Error('not a backup');
+      // Every record is validated by applyRemote; broken ones are skipped, not stored.
+      const now = Date.now();
       let n = 0;
-      for (const [k, env] of Object.entries(json.docs)) if (env && applyRemote(k, env.data, Math.max(env.updatedAt, Date.now()))) n++;
-      toast({ title: 'Yedek yüklendi', body: `${n} kayıt` });
+      let skipped = 0;
+      for (const [k, env] of Object.entries(json.docs)) {
+        if (env && typeof env === 'object' && applyRemote(k, env.data, now)) n++;
+        else skipped++;
+      }
+      toast({ title: 'Yedek yüklendi', body: skipped ? `${n} kayıt, ${skipped} bozuk kayıt atlandı` : `${n} kayıt` });
       void fullSync();
     } catch {
       toast({ title: 'Dosya okunamadı' });
@@ -336,20 +367,30 @@ function DataCard() {
     <div className="card">
       <h2>Veri</h2>
       <div className="row-wrap">
-        <button className="btn btn-sm" onClick={exportData}>
+        <button className="btn btn-sm" onClick={() => void exportData()}>
           Yedek indir
         </button>
         <button className="btn btn-sm" onClick={() => file.current?.click()}>
           Yedek yükle
         </button>
-        <input ref={file} type="file" accept="application/json" hidden onChange={(e) => void importData(e.target.files?.[0])} />
+        <input
+          ref={file}
+          type="file"
+          accept="application/json"
+          hidden
+          onChange={(e) => {
+            void importData(e.target.files?.[0]);
+            e.target.value = ''; // so picking the same file again still works
+          }}
+        />
       </div>
       <HoldButton
         ms={3000}
-        onDone={() => {
-          resetAll();
-          toast({ title: 'Bu cihazdaki veriler sıfırlandı' });
-        }}
+        onDone={() =>
+          void resetLocal().then(() =>
+            toast({ title: 'Bu cihazdaki veriler sıfırlandı', body: 'Senkron hesabından da çıkış yapıldı.' }),
+          )
+        }
       >
         Bu cihazdaki her şeyi sıfırla (3 sn basılı tut)
       </HoldButton>

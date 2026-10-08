@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { artUrl, Chips, cssVars, Icon, Sheet, Switch, TimeInput } from '../components/ui';
+import { artUrl, Chips, cssVars, Icon, NumberInput, Sheet, Switch, TimeInput } from '../components/ui';
 import { AppPicker } from '../components/AppPicker';
 import { addDays, ALL_DAYS, dateKey, fmtDuration, WEEK_ORDER, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from '../lib/time';
 import { resolveDay, uid } from '../model/schedule';
@@ -154,14 +154,7 @@ function TemplateItemSheet({ item, onClose }: { item: TemplateItem; onClose: () 
         </label>
         <label className="field">
           <span>Süre (dk)</span>
-          <input
-            className="input num"
-            type="number"
-            min={5}
-            step={5}
-            value={item.duration}
-            onChange={(e) => upd({ duration: Math.max(5, Number(e.target.value) || 5) })}
-          />
+          <NumberInput min={5} max={24 * 60} step={5} value={item.duration} onChange={(v) => v !== undefined && upd({ duration: v })} />
         </label>
       </div>
       <div className="field">
@@ -182,14 +175,7 @@ function TemplateItemSheet({ item, onClose }: { item: TemplateItem; onClose: () 
       {item.minimal && (
         <label className="field">
           <span>Kötü gün süresi (dk, boş: aynı)</span>
-          <input
-            className="input num"
-            type="number"
-            min={5}
-            step={5}
-            value={item.minimalDuration ?? ''}
-            onChange={(e) => upd({ minimalDuration: Number(e.target.value) || undefined })}
-          />
+          <NumberInput min={5} max={24 * 60} step={5} allowEmpty value={item.minimalDuration} onChange={(v) => upd({ minimalDuration: v })} />
         </label>
       )}
       <button
