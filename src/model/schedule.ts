@@ -168,12 +168,17 @@ export function moveItem(
 
 const isOpen = (i: ResolvedItem) => i.log.status !== 'done' && i.log.status !== 'skipped' && i.log.status !== 'active';
 
-/** Push the open blocks that come after `target` (in plan order) so none starts
- *  before `prevEnd`; stops at the first gap that absorbs the shift. */
-function pushAfter(day: DayDoc, items: ResolvedItem[], target: ResolvedItem, prevEnd: number): DayDoc {
+/** Push the open blocks that start at or after `from` (other than `target`) so
+ *  none starts before `prevEnd`; stops at the first gap that absorbs the shift. */
+function pushAfter(day: DayDoc, items: ResolvedItem[], target: ResolvedItem, from: number, prevEnd: number): DayDoc {
   let next = day;
   const after = items
-    .filter((i) => i.id !== target.id && isOpen(i) && (i.start > target.start || (i.start === target.start && i.end >= target.end)))
+    .filter(
+      (i) =>
+        i.id !== target.id &&
+        isOpen(i) &&
+        (i.start > from || (i.start === from && (from !== target.start || i.end >= target.end))),
+    )
     .sort((a, b) => a.start - b.start);
   for (const it of after) {
     if (it.start >= prevEnd) break;
@@ -184,14 +189,15 @@ function pushAfter(day: DayDoc, items: ResolvedItem[], target: ResolvedItem, pre
 }
 
 /**
- * Snooze / late start: the block moves to `newStart` and everything that was
- * planned after it moves along, so the block keeps its place in the order.
+ * Snooze / starting now: the block moves to `newStart`. Later: everything
+ * planned after it moves along, so it keeps its place in the order. Earlier:
+ * blocks it now overlaps move after it (you are doing this one now).
  */
 export function postponeItem(day: DayDoc, items: ResolvedItem[], id: string, newStart: Minutes): DayDoc {
   const target = items.find((i) => i.id === id);
   if (!target) return day;
   const start = Math.round(newStart);
-  return pushAfter(setOverride(day, id, { start }), items, target, start + target.duration);
+  return pushAfter(setOverride(day, id, { start }), items, target, Math.min(start, target.start), start + target.duration);
 }
 
 /** Longer blocks push the following ones, the same way moving does. */
@@ -199,7 +205,7 @@ export function setDuration(day: DayDoc, items: ResolvedItem[], id: string, dura
   const d = Math.max(5, Math.round(duration));
   const target = items.find((i) => i.id === id);
   const next = setOverride(day, id, { duration: d });
-  return target ? pushAfter(next, items, target, target.start + d) : next;
+  return target ? pushAfter(next, items, target, target.start, target.start + d) : next;
 }
 
 function setLog(day: DayDoc, id: string, log: ItemLog): DayDoc {

@@ -46,16 +46,23 @@ public class PlanNativePlugin extends Plugin {
     public void setSchedule(PluginCall call) {
         JSArray events = call.getArray("events", new JSArray());
         JSArray windows = call.getArray("windows", new JSArray());
-        // Blocks the app still lists as waiting to start: earlier button taps for
-        // them were already applied (actions are consumed before every push).
+        // The app consumes button taps before every push, so this plan is the truth:
+        // blocks it still lists as waiting to start lose an old "Başladım/Atla" mark,
+        // and blocks it still lists at all (e.g. a stale "Atla" it rejected) are not closed.
         Set<String> pending = new HashSet<>();
+        Set<String> alive = new HashSet<>();
         for (int i = 0; i < events.length(); i++) {
             org.json.JSONObject e = events.optJSONObject(i);
             if (e == null) continue;
             String kind = e.optString("kind");
+            alive.add(e.optString("itemKey"));
             if ("pre".equals(kind) || "start".equals(kind) || "remind".equals(kind)) pending.add(e.optString("itemKey"));
         }
-        Store.reopen(getContext(), pending);
+        for (int i = 0; i < windows.length(); i++) {
+            org.json.JSONObject w = windows.optJSONObject(i);
+            if (w != null && w.has("itemKey")) alive.add(w.optString("itemKey"));
+        }
+        Store.reopen(getContext(), pending, alive);
         Store.setSchedule(getContext(), events, windows);
         new Thread(() -> {
             Scheduler.run(getContext());

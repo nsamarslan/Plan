@@ -105,6 +105,19 @@ describe('new8: "15 dk sonra" keeps the block in its place', () => {
   });
 });
 
+describe('starting a block early', () => {
+  it('moves blocks it now overlaps after it', () => {
+    const tpl = defaultTemplate();
+    const items = resolveDay(MON, tpl, types, undefined);
+    const read = items.find((i) => i.label === 'Okuma 1')!; // 13:30–14:30
+    const day = startItem(emptyDay(MON), items, read.id, at(MON, 12, 30)); // lunch 12:45 is in the way
+    const after = resolveDay(MON, tpl, types, day);
+    expect(after.find((i) => i.id === read.id)!.start).toBe(12 * 60 + 30);
+    expect(after.find((i) => i.label === 'Öğle Yemeği')!.start).toBe(13 * 60 + 30);
+    expect(after.find((i) => i.typeId === 'design')!.start).toBe(14 * 60 + 45); // gap absorbs it
+  });
+});
+
 describe('M1: a longer block pushes the next ones', () => {
   it('cascades on duration change', () => {
     const tpl = defaultTemplate();

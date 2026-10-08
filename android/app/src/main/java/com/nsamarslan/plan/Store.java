@@ -71,12 +71,11 @@ final class Store {
      * (it has seen every button tap by then), so earlier taps no longer apply —
      * e.g. after "Durumu sıfırla" or moving the block.
      */
-    static void reopen(Context c, Set<String> pendingKeys) {
-        if (pendingKeys.isEmpty()) return;
+    static void reopen(Context c, Set<String> pendingKeys, Set<String> aliveKeys) {
         SharedPreferences p = prefs(c);
         Set<String> acked = new HashSet<>(p.getStringSet(ACKED, new HashSet<>()));
         Set<String> closed = new HashSet<>(p.getStringSet(CLOSED, new HashSet<>()));
-        if (acked.removeAll(pendingKeys) | closed.removeAll(pendingKeys)) {
+        if (acked.removeAll(pendingKeys) | closed.removeAll(aliveKeys)) {
             p.edit().putStringSet(ACKED, acked).putStringSet(CLOSED, closed).apply();
         }
     }
