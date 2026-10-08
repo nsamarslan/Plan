@@ -51,14 +51,18 @@ Kalkış 07:00, yatış 22:30. Plan → Şablon ekranından her şeyi değiştir
 ## Senkron kurulumu (5 dakika, ücretsiz)
 
 1. [supabase.com](https://supabase.com) → ücretsiz hesap → **New project**.
-2. **SQL Editor** → `supabase/schema.sql` dosyasının içeriğini yapıştır → **Run**.
+2. **SQL Editor** → `supabase/schema.sql` dosyasının içeriğini yapıştır → **Run**. Daha önce çalıştırdıysan yeni sürümü de aynı şekilde çalıştır; tekrar çalıştırmak güvenli.
 3. **Authentication → Sign In / Providers → Email**: "Confirm email" seçeneğini kapat. Böylece onay maili beklemeden giriş yaparsın.
 4. **Project Settings → API**: `Project URL` ve `anon public` anahtarını kopyala.
 5. İki yoldan birini seç:
-   - **Kolay:** Uygulamada Ayarlar → Senkron'a yapıştır. Bunu telefonda ve web'de bir kez yap.
+   - **Kolay:** Uygulamada Ayarlar → Senkron'a yapıştır. Bunu telefonda ve web'de bir kez yap. Bu bilgi sadece o cihazda saklanır, diğer cihazın ayarlarını değiştirmez.
    - **Kalıcı:** GitHub → Settings → Secrets and variables → Actions → **Variables** sekmesine `SUPABASE_URL` ve `SUPABASE_ANON_KEY` ekle. Bundan sonraki her derleme bu bilgilerle gelir.
 
 Sonra iki cihazda da aynı e-posta ve şifreyle giriş yap.
+
+- Bir cihazda **Çıkış** yapmak sadece o cihazı çıkarır.
+- Aynı cihazda başka bir hesaba girersen, önceki hesabın verileri yeni hesaba karışmaz; cihaz yeni hesabın verileriyle başlar.
+- **Ayarlar → Veri → Bu cihazdaki her şeyi sıfırla** o cihazı senkrondan da çıkarır.
 
 ## Sesli odak
 
