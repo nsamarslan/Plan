@@ -260,9 +260,13 @@ class FocusAudioEngine {
   private say(text: string): Promise<void> {
     const s = this.settings!;
     if (isNative) {
-      return PlanNative.speak({ text, lang: s.lang, rate: s.rate, pitch: s.pitch, volume: s.voiceVolume, voice: s.voiceName || undefined }).catch(
-        () => {},
-      );
+      // Never wait forever: a stuck speech engine must not leave music ducked and cues stopped.
+      return Promise.race([
+        PlanNative.speak({ text, lang: s.lang, rate: s.rate, pitch: s.pitch, volume: s.voiceVolume, voice: s.voiceName || undefined }).catch(
+          () => {},
+        ),
+        new Promise<void>((r) => setTimeout(r, 15_000)),
+      ]);
     }
     const synth = window.speechSynthesis;
     if (!synth) return Promise.resolve();

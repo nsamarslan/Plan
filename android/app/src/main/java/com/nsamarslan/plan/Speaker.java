@@ -21,6 +21,8 @@ final class Speaker {
 
     private TextToSpeech tts;
     private boolean ready;
+    /** Init callback has run (successfully or not). */
+    private boolean initDone;
     private final List<Runnable> pending = new ArrayList<>();
     private final Map<String, Done> callbacks = new HashMap<>();
     private int seq;
@@ -29,6 +31,7 @@ final class Speaker {
         tts = new TextToSpeech(c.getApplicationContext(), status -> {
             synchronized (Speaker.this) {
                 ready = status == TextToSpeech.SUCCESS;
+                initDone = true;
                 for (Runnable r : pending) r.run();
                 pending.clear();
             }
@@ -61,7 +64,8 @@ final class Speaker {
     }
 
     private synchronized void whenReady(Runnable r) {
-        if (ready || tts == null) r.run();
+        // After a failed init, run right away (it answers "done" instead of hanging).
+        if (initDone || tts == null) r.run();
         else pending.add(r);
     }
 

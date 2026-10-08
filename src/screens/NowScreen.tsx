@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { setAudioMuted } from '../audio/controller';
 import { TiltGuide } from '../components/TiltGuide';
 import { artUrl, cssVars, Icon, Ring, Sheet } from '../components/ui';
@@ -34,8 +34,29 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
   const today = dateKey(new Date(now));
   const items = useMemo(() => resolveDay(today, s.template, s.types, s.days[today]), [today, s.template, s.types, s.days]);
   // A block from yesterday that runs past midnight still shows up here.
-  const { current, currentStatus, next, currentDate } = nowStateAround(today, s.template, s.types, s.days, now);
-  const currentItems = currentDate === today ? items : resolveDay(currentDate, s.template, s.types, s.days[currentDate]);
+  const st = nowStateAround(today, s.template, s.types, s.days, now);
+  const { next } = st;
+  let { current, currentStatus, currentDate } = st;
+  let currentItems = currentDate === today ? items : resolveDay(currentDate, s.template, s.types, s.days[currentDate]);
+
+  // A pelvis routine in progress stays on screen past the block's planned end
+  // (up to 30 min) until "Rutini bitir", instead of vanishing mid-exercise.
+  const [guideKey, setGuideKey] = useState<string | null>(null);
+  const guideOpen = current?.type.mode === 'tilt' && currentStatus === 'active' ? `${currentDate}|${current.id}` : null;
+  useEffect(() => {
+    if (guideOpen) setGuideKey(guideOpen);
+  }, [guideOpen]);
+  if (guideKey && guideKey !== guideOpen) {
+    const [gDate, gId] = guideKey.split('|');
+    const gItems = gDate === today ? items : resolveDay(gDate, s.template, s.types, s.days[gDate]);
+    const gi = gItems.find((i) => i.id === gId);
+    if (gi && gi.log.status === 'active' && now < msAt(gDate, gi.end) + 30 * MIN_MS) {
+      current = gi;
+      currentStatus = 'active';
+      currentDate = gDate;
+      currentItems = gItems;
+    }
+  }
   const nowMin = minutesOfDay(new Date(now));
   const stats = dayStats(today, items, now);
   const minuteKey = Math.floor(now / MIN_MS);

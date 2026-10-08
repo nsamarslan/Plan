@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { addAudio, deleteAudio, listAudio, type AudioKind, type AudioMeta } from '../audio/db';
-import { focusAudio, previewCue } from '../audio/engine';
+import { setAudioTest, useAudioTest } from '../audio/controller';
+import { previewCue } from '../audio/engine';
 import { Icon, NumberInput, Segmented, Switch } from '../components/ui';
 import { uid } from '../model/schedule';
 import type { AudioSettings } from '../model/types';
@@ -39,7 +40,9 @@ export function AudioSettingsCard() {
   const set = (patch: Partial<AudioSettings>) => updateSettings((x) => ({ ...x, audio: { ...x.audio, ...patch } }));
   const [files, setFiles] = useState<AudioMeta[]>([]);
   const [newPhrase, setNewPhrase] = useState('');
-  const [testing, setTesting] = useState(false);
+  const testing = useAudioTest();
+  // Leaving Ayarlar ends the test.
+  useEffect(() => () => setAudioTest(false), []);
   const voices = useVoices(a.lang);
   const refresh = () => void listAudio().then(setFiles);
   useEffect(refresh, []);
@@ -145,11 +148,7 @@ export function AudioSettingsCard() {
         </button>
         <button
           className="btn btn-sm"
-          onClick={() => {
-            if (testing) focusAudio.stop();
-            else focusAudio.start(a, 'DSA');
-            setTesting(!testing);
-          }}
+          onClick={() => setAudioTest(!testing)}
         >
           <Icon name={testing ? 'stop' : 'play'} size={16} /> {testing ? 'Testi durdur' : 'Hepsini test et'}
         </button>
