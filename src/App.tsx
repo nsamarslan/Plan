@@ -3,7 +3,10 @@ import { useFocusAudioController } from './audio/controller';
 import { Icon, Toasts, type IconName } from './components/ui';
 import { useNow } from './hooks/useNow';
 import { dateKey } from './lib/time';
+import { QUICK_COLOR, quickKey, quickLabel, quickState } from './model/quick';
 import { nowStateAround, pomodoroAt } from './model/schedule';
+import { toast } from './services/toast';
+import { expireQuick, useQuickSession } from './store/quick';
 import { NowScreen } from './screens/NowScreen';
 import { PlanScreen } from './screens/PlanScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -29,8 +32,19 @@ export function App() {
   const { current, currentStatus, currentDate } = nowStateAround(today, s.template, s.types, s.days, now);
   const inBreak =
     !!current && currentStatus === 'active' && current.type.mode === 'pomodoro' && pomodoroAt(current, currentDate, now).phase.kind === 'break';
+  const quick = useQuickSession();
+  const quickAudio = quick
+    ? { key: quickKey(quick), label: quickLabel(quick), inBreak: quickState(quick, now).phase.kind === 'break' }
+    : undefined;
   // Audio keeps playing while you move between tabs (and pauses in pomodoro breaks).
-  const audio = useFocusAudioController(s.settings, current, currentStatus, currentDate, inBreak);
+  const audio = useFocusAudioController(s.settings, current, currentStatus, currentDate, inBreak, quickAudio);
+
+  // A standalone pomodoro that ran out ends by itself.
+  useEffect(() => {
+    if (quick && expireQuick(now)) {
+      toast({ title: `${quickLabel(quick)} bitti`, body: `${quick.rounds} tur tamam. Eline sağlık.`, color: QUICK_COLOR });
+    }
+  }, [now, quick]);
 
   // Opening the app from a block notification always lands on "Şimdi".
   useEffect(() => {

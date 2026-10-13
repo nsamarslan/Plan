@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { setAudioMuted } from '../audio/controller';
 import { BREAK_COLOR, PieTimer } from '../components/PieTimer';
+import { QUICK_COLOR, quickDuration, quickEndsAt, quickLabel, quickState, type QuickSession } from '../model/quick';
+import { stopQuick, useQuickSession } from '../store/quick';
+import { QuickPomodoroSheet } from './QuickPomodoroSheet';
 import { TiltGuide } from '../components/TiltGuide';
 import { artUrl, cssVars, Icon, Ring, Sheet } from '../components/ui';
 import { useWakeLock } from '../hooks/useWakeLock';
@@ -65,7 +68,10 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
     () => activeFocus(buildFocusWindows(planInput(minuteKey * MIN_MS)), now),
     [minuteKey, s],
   );
-  useWakeLock(!!current);
+  // A standalone pomodoro (started from the timer button) takes the screen.
+  const quick = useQuickSession();
+  const [quickOpen, setQuickOpen] = useState(false);
+  useWakeLock(!!current || !!quick);
   // The note sheet stays bound to the block type it was opened for, even if the
   // block ends while typing.
   const [noteFor, setNoteFor] = useState<string | null>(null);
@@ -83,7 +89,9 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
 
   let art: ArtKey = 'free';
   let color = '#64748b';
-  if (current) {
+  if (quick) {
+    color = QUICK_COLOR;
+  } else if (current) {
     art = current.type.art;
     color = current.type.color;
   } else if (asleep || dayOver) {
@@ -103,6 +111,11 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
         </span>
       )}
       <span className="spacer" />
+      {!quick && (
+        <button className="icon-btn" aria-label="Pomodoro başlat" onClick={() => setQuickOpen(true)}>
+          <Icon name="timer" />
+        </button>
+      )}
       {audio.wanted && (
         <button
           className="icon-btn"
@@ -131,8 +144,8 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
 
   return (
     <div
-      className={`now ${current?.type.mode === 'tilt' && currentStatus === 'active' ? 'now--guide' : ''} ${
-        current?.type.mode === 'pomodoro' && currentStatus === 'active' ? 'now--pomo' : ''
+      className={`now ${!quick && current?.type.mode === 'tilt' && currentStatus === 'active' ? 'now--guide' : ''} ${
+        quick || (current?.type.mode === 'pomodoro' && currentStatus === 'active') ? 'now--pomo' : ''
       }`}
       style={cssVars({ '--c': color })}
     >
@@ -140,7 +153,9 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
       <div className="now-shade" />
       {top}
       <div className="now-body">
-        {current ? (
+        {quick ? (
+          <QuickCurrent session={quick} now={now} planNow={current} next={next} />
+        ) : current ? (
           <Current
             item={current}
             status={currentStatus!}
@@ -153,9 +168,10 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
         ) : asleep || dayOver ? (
           <Sleep dayOver={dayOver} sleepAt={s.settings.sleep} first={tomorrowFirst} />
         ) : (
-          <Free next={next} items={items} today={today} now={now} />
+          <Free next={next} items={items} today={today} now={now} onQuick={() => setQuickOpen(true)} />
         )}
       </div>
+      {quickOpen && <QuickPomodoroSheet onClose={() => setQuickOpen(false)} />}
       {noteType && (
         <NoteSheet
           title={`${noteType.name} — sıradaki`}
@@ -352,7 +368,19 @@ function NoteSheet({ title, value, onSave, onClose }: { title: string; value: st
   );
 }
 
-function Free({ next, items, today, now }: { next?: ResolvedItem; items: ResolvedItem[]; today: string; now: number }) {
+function Free({
+  next,
+  items,
+  today,
+  now,
+  onQuick,
+}: {
+  next?: ResolvedItem;
+  items: ResolvedItem[];
+  today: string;
+  now: number;
+  onQuick: () => void;
+}) {
   const tip = DAILY_HABITS[Math.floor(now / (10 * MIN_MS)) % DAILY_HABITS.length];
   if (!next) return null;
   const inSec = (msAt(today, next.start) - now) / 1000;
@@ -376,6 +404,9 @@ function Free({ next, items, today, now }: { next?: ResolvedItem; items: Resolve
         <b>DURUŞ</b>
         {tip}
       </p>
+      <button className="btn btn-ghost" onClick={onQuick}>
+        <Icon name="timer" /> Pomodoro başlat
+      </button>
       <div className="now-next" style={cssVars({ '--nc': next.type.color })}>
         <i />
         <span>
@@ -386,6 +417,80 @@ function Free({ next, items, today, now }: { next?: ResolvedItem; items: Resolve
           Erken başla
         </button>
       </div>
+    </>
+  );
+}
+
+/** A standalone pomodoro: the same pie, with a stop button. */
+function QuickCurrent({
+  session,
+  now,
+  planNow,
+  next,
+}: {
+  session: QuickSession;
+  now: number;
+  planNow?: ResolvedItem;
+  next?: ResolvedItem;
+}) {
+  const [confirmStop, setConfirmStop] = useState(false);
+  useEffect(() => {
+    if (!confirmStop) return;
+    const t = setTimeout(() => setConfirmStop(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirmStop]);
+  const st = quickState(session, now);
+  const brk = st.phase.kind === 'break';
+  const after = st.phases[st.index + 1];
+  const roundLabel = brk ? 'Mola' : `Odak ${st.focusNo}/${st.focusTotal}`;
+  return (
+    <>
+      <div className="pomo-hero">
+        <PieTimer
+          className="pie-timer"
+          phaseLeftSec={st.phaseLeftSec}
+          phaseTotalSec={st.phaseTotalSec}
+          kind={st.phase.kind}
+          color={QUICK_COLOR}
+          phases={st.phases}
+          blockMin={quickDuration(session)}
+          elapsedMin={st.elapsedMin}
+          label={roundLabel.toLocaleUpperCase('tr')}
+        />
+      </div>
+      <div className="now-main">
+        <div className="now-head">
+          <span className="now-kicker" style={{ color: brk ? BREAK_COLOR : QUICK_COLOR }}>
+            {roundLabel}
+          </span>
+          <h1 className="now-title">{quickLabel(session)}</h1>
+          <span className="now-time num">
+            {session.focus}/{session.brk} · {session.rounds} tur · bitiş {fmt(minutesOfDay(new Date(quickEndsAt(session))))}
+          </span>
+          <span className="pill" style={{ alignSelf: 'flex-start' }}>
+            {brk ? 'Kalk, su iç, ekrana bakma' : after ? `Sonra ${after.end - after.start} dk ${after.kind === 'break' ? 'mola' : 'odak'}` : 'Son odak'}
+          </span>
+        </div>
+      </div>
+      <div className="now-actions">
+        <button
+          className={`btn ${confirmStop ? 'btn-danger' : 'btn-ghost'}`}
+          style={{ minHeight: 56 }}
+          onClick={() => (confirmStop ? stopQuick() : setConfirmStop(true))}
+        >
+          <Icon name="stop" /> {confirmStop ? 'Bitirmek için tekrar dokun' : 'Pomodoroyu bitir'}
+        </button>
+      </div>
+      {planNow ? (
+        <div className="now-next" style={cssVars({ '--nc': planNow.type.color })}>
+          <i />
+          <span>
+            Planda şimdi: <b>{planNow.label}</b>
+          </span>
+        </div>
+      ) : (
+        <NextLine next={next} />
+      )}
     </>
   );
 }

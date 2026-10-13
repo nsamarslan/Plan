@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { artUrl, Chips, cssVars, Icon, NumberInput, Sheet, Switch, TimeInput } from '../components/ui';
 import { AppPicker } from '../components/AppPicker';
 import { addDays, ALL_DAYS, dateKey, fmtDuration, WEEK_ORDER, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from '../lib/time';
+import { POMO_PRESETS } from '../model/quick';
 import { pomodoroLengths, pomodoroPhases, resolveDay, uid } from '../model/schedule';
 import type { ArtKey, BlockMode, BlockType, TemplateItem } from '../model/types';
 import { isNative } from '../native/plan';
@@ -198,12 +199,6 @@ const MODES: { value: BlockMode; label: string }[] = [
   { value: 'walk', label: 'Yürüyüş (yarıda dönüş)' },
   { value: 'meditation', label: 'Meditasyon (nefes)' },
   { value: 'tilt', label: 'Pelvis rehberi' },
-];
-
-const POMO_PRESETS = [
-  { focus: 25, brk: 5 },
-  { focus: 50, brk: 10 },
-  { focus: 45, brk: 15 },
 ];
 
 function PomodoroEditor({ type, onChange }: { type: BlockType; onChange: (patch: Partial<BlockType>) => void }) {

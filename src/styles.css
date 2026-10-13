@@ -117,6 +117,7 @@ h1, h2, h3, p { margin: 0; }
 .row-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
 .spacer { flex: 1; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 
 .card {
   background: var(--bg-2);

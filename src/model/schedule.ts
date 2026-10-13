@@ -321,8 +321,13 @@ export interface PomodoroState {
 /** Where a pomodoro block is at `nowMs` (phases are counted from the block's planned start). */
 export function pomodoroAt(item: ResolvedItem, date: DateKey, nowMs: number): PomodoroState {
   const { focus, brk } = pomodoroLengths(item.type);
-  const phases = pomodoroPhases(item.duration, focus, brk);
-  const elapsedMin = Math.min(item.duration, Math.max(0, (nowMs - msAt(date, item.start)) / 60_000));
+  return phaseStateAt(pomodoroPhases(item.duration, focus, brk), msAt(date, item.start), nowMs);
+}
+
+/** Phase state for any run of phases that started at `startMs`. */
+export function phaseStateAt(phases: PomodoroPhase[], startMs: number, nowMs: number): PomodoroState {
+  const duration = phases.length ? phases[phases.length - 1].end : 0;
+  const elapsedMin = Math.min(duration, Math.max(0, (nowMs - startMs) / 60_000));
   let index = phases.findIndex((p) => elapsedMin >= p.start && elapsedMin < p.end);
   if (index < 0) index = phases.length - 1;
   const phase = phases[index];

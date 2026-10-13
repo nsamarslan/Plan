@@ -1,0 +1,10 @@
+import { useEffect, useState } from 'react';
+/** Current time in ms, re-rendering every `everyMs`. */
+export function useNow(everyMs = 1000) {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), everyMs);
+        return () => clearInterval(id);
+    }, [everyMs]);
+    return now;
+}

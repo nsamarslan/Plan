@@ -51,12 +51,18 @@ export function useFocusAudioController(
   dateKey: string,
   /** Pomodoro break: step away, so music and cues pause until the next focus. */
   inBreak = false,
+  /** A standalone pomodoro counts as a focus block. */
+  quick?: { key: string; label: string; inBreak: boolean },
 ) {
   const muted = useAudioMuted();
   const test = useAudioTest();
-  const key = current ? `${dateKey}|${current.id}` : 'free';
-  const wanted = (audioWanted(settings, current, status) && muted !== key && !inBreak) || test;
-  const label = current?.label ?? (test ? 'DSA' : '');
+  const a = settings.audio;
+  const hasSomething = a.voiceEnabled || (a.musicEnabled && a.musicIds.length > 0);
+  const key = quick ? quick.key : current ? `${dateKey}|${current.id}` : 'free';
+  const planWanted = quick ? hasSomething : audioWanted(settings, current, status);
+  const breakNow = quick ? quick.inBreak : inBreak;
+  const wanted = (planWanted && muted !== key && !breakNow) || test;
+  const label = quick ? quick.label : current?.label ?? (test ? 'DSA' : '');
 
   useEffect(() => {
     if (wanted) focusAudio.start(settings.audio, label);
@@ -65,5 +71,5 @@ export function useFocusAudioController(
 
   useEffect(() => () => focusAudio.stop(), []);
 
-  return { wanted: audioWanted(settings, current, status), muted: muted === key, key };
+  return { wanted: planWanted, muted: muted === key, key };
 }

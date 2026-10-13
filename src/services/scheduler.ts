@@ -4,7 +4,9 @@ import { buildEvents, buildFocusWindows, type FocusWindow, type NotifyEvent, typ
 import { finishItem, resolveDay, skipItem, startItem } from '../model/schedule';
 import { isNative, PlanNative, type NativeAction } from '../native/plan';
 import { getState, getDay, subscribe, updateDay } from '../store/store';
+import { getQuickSession, subscribeQuick } from '../store/quick';
 import { pullNow } from '../store/sync';
+import { quickEvents, quickWindows } from '../model/quick';
 import { toast } from './toast';
 
 // Two weeks: the phone keeps notifying even if the app isn't opened for a while.
@@ -34,6 +36,14 @@ async function push() {
   const input = planInput();
   const events = buildEvents(input);
   const windows = buildFocusWindows(input);
+  // A standalone pomodoro started from the Şimdi screen.
+  const quick = getQuickSession();
+  if (quick) {
+    events.push(...quickEvents(quick, input.nowMs));
+    events.sort((a, b) => a.at - b.at);
+    windows.push(...quickWindows(quick, input.settings, input.nowMs));
+    windows.sort((a, b) => a.start - b.start);
+  }
   if (isNative) {
     const sig = JSON.stringify([events, windows]);
     if (sig === lastSig) return;
@@ -112,6 +122,7 @@ export function startScheduler() {
     timer = setTimeout(() => void push(), 600);
   };
   subscribe(soon);
+  subscribeQuick(soon);
   void push();
   // Re-plan every minute so events roll forward past midnight.
   setInterval(() => void push(), 60_000);

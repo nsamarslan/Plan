@@ -43,6 +43,12 @@ const paths: Record<string, ReactNode> = {
   trash: <path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" />,
   play: <path d="M7 5v14l12-7L7 5Z" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
+  timer: (
+    <>
+      <circle cx="12" cy="13.5" r="7.5" />
+      <path d="M12 9.5v4l2.5 2M9.5 2.5h5M12 2.5v3.5" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof paths;
