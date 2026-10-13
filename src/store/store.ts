@@ -168,6 +168,8 @@ function cleanTypes(v: unknown): BlockType[] | null {
     .map((t) => {
       const merged = { ...TYPE_BASE, ...(byId.get(t.id as string) ?? {}), ...t } as BlockType;
       merged.allowedApps = strings(merged.allowedApps);
+      if (!(isNum(merged.focusMin) && merged.focusMin >= 5 && merged.focusMin <= 240)) delete merged.focusMin;
+      if (!(isNum(merged.breakMin) && merged.breakMin >= 0 && merged.breakMin <= 120)) delete merged.breakMin;
       if (!isStr(merged.note)) merged.note = '';
       if (!isStr(merged.firstStep)) merged.firstStep = '';
       return merged;

@@ -1,5 +1,5 @@
 import { addDays, fmt, msAt, MIN_MS, weekday, type DateKey } from '../lib/time';
-import { pomodoroPhases, resolveDay } from './schedule';
+import { pomodoroLengths, pomodoroPhases, resolveDay } from './schedule';
 import type { ArtKey, BlockType, DayDoc, ResolvedItem, Settings, TemplateItem } from './types';
 
 export type NotifyKind = 'pre' | 'start' | 'remind' | 'cue' | 'end';
@@ -81,12 +81,19 @@ export function buildEvents(input: PlanInput): NotifyEvent[] {
       }
 
       if (it.type.mode === 'pomodoro') {
-        const phases = pomodoroPhases(it.duration);
+        const { focus, brk } = pomodoroLengths(it.type);
+        const phases = pomodoroPhases(it.duration, focus, brk);
+        const total = phases.filter((p) => p.kind === 'focus').length;
+        let focusNo = 1;
         phases.forEach((p, i) => {
           if (i === 0) return;
           const at = startMs + p.start * MIN_MS;
-          if (p.kind === 'break') push('cue', at, `Mola: ${p.end - p.start} dk`, 'Kalk, su iç, ekrana bakma.', false, i);
-          else push('cue', at, `Odak: ${it.label}`, 'Moladan dön, kaldığın yerden devam.', false, i);
+          if (p.kind === 'break') {
+            push('cue', at, `Mola: ${p.end - p.start} dk`, 'Kalk, su iç, ekrana bakma.', false, i);
+          } else {
+            focusNo++;
+            push('cue', at, `Odak ${focusNo}/${total}: ${it.label}`, `${p.end - p.start} dk. Moladan dön, kaldığın yerden devam.`, false, i);
+          }
         });
       } else if (it.type.mode === 'walk' && it.duration >= 20) {
         push('cue', startMs + Math.floor(it.duration / 2) * MIN_MS, 'Dönüş zamanı', 'Yarıyı geçtin, eve doğru dön.', false, 1);

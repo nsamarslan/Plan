@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { setAudioMuted } from '../audio/controller';
+import { BREAK_COLOR, PieTimer } from '../components/PieTimer';
 import { TiltGuide } from '../components/TiltGuide';
 import { artUrl, cssVars, Icon, Ring, Sheet } from '../components/ui';
 import { useWakeLock } from '../hooks/useWakeLock';
@@ -10,7 +11,7 @@ import {
   finishItem,
   nowStateAround,
   postponeItem,
-  pomodoroPhases,
+  pomodoroAt,
   resolveDay,
   skipItem,
   START_GRACE_MIN,
@@ -129,7 +130,12 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
   );
 
   return (
-    <div className={`now ${current?.type.mode === 'tilt' && currentStatus === 'active' ? 'now--guide' : ''}`} style={cssVars({ '--c': color })}>
+    <div
+      className={`now ${current?.type.mode === 'tilt' && currentStatus === 'active' ? 'now--guide' : ''} ${
+        current?.type.mode === 'pomodoro' && currentStatus === 'active' ? 'now--pomo' : ''
+      }`}
+      style={cssVars({ '--c': color })}
+    >
       <img className="now-art" src={artUrl(art)} alt="" />
       <div className="now-shade" />
       {top}
@@ -221,20 +227,18 @@ function Current({
 
   // Phase inside the block (pomodoro focus/break, walk turnaround).
   let phaseLabel = '';
-  let ringLabel = active ? 'kaldı' : `${lateMin} dk geçti`;
-  let ringSec = leftSec;
-  let ringProgress = progress;
-  if (active && type.mode === 'pomodoro') {
-    const el = (now - startMs) / MIN_MS;
-    const phases = pomodoroPhases(item.duration);
-    const pi = phases.findIndex((p) => el >= p.start && el < p.end);
-    const p = phases[Math.max(0, pi)];
-    const focusIdx = phases.filter((x, i) => x.kind === 'focus' && i <= pi).length;
-    const focusTotal = phases.filter((x) => x.kind === 'focus').length;
-    phaseLabel = p.kind === 'break' ? 'Mola — kalk, su iç, ekrana bakma' : `Odak ${focusIdx}/${focusTotal}`;
-    ringSec = (startMs + p.end * MIN_MS - now) / 1000;
-    ringProgress = (el - p.start) / (p.end - p.start);
-    ringLabel = p.kind === 'break' ? 'mola' : 'odak';
+  const ringLabel = active ? 'kaldı' : `${lateMin} dk geçti`;
+  const pomo = active && type.mode === 'pomodoro' ? pomodoroAt(item, today, now) : null;
+  let kicker = active ? 'Şu an' : lateMin > START_GRACE_MIN ? 'Sıra bunda' : 'Başlama zamanı';
+  if (pomo) {
+    const brk = pomo.phase.kind === 'break';
+    const after = pomo.phases[pomo.index + 1];
+    kicker = brk ? 'Mola' : `Odak ${pomo.focusNo}/${pomo.focusTotal}`;
+    phaseLabel = brk
+      ? 'Kalk, su iç, ekrana bakma'
+      : after
+        ? `Sonra ${after.end - after.start} dk ${after.kind === 'break' ? 'mola' : 'odak'}`
+        : 'Son odak';
   } else if (active && type.mode === 'walk') {
     const turnAt = startMs + Math.floor(item.duration / 2) * MIN_MS;
     phaseLabel = now < turnAt ? `Dönüş: ${fmt(minutesOfDay(new Date(turnAt)))}` : 'Eve doğru dön';
@@ -245,19 +249,38 @@ function Current({
   return (
     <>
       {active && type.mode === 'meditation' && <div className="breath breath-loop" />}
+      {pomo && (
+        <div className="pomo-hero">
+          <PieTimer
+            className="pie-timer"
+            phaseLeftSec={pomo.phaseLeftSec}
+            phaseTotalSec={pomo.phaseTotalSec}
+            kind={pomo.phase.kind}
+            color={type.color}
+            phases={pomo.phases}
+            blockMin={item.duration}
+            elapsedMin={pomo.elapsedMin}
+            label={pomo.phase.kind === 'break' ? 'MOLA' : `ODAK ${pomo.focusNo}/${pomo.focusTotal}`}
+          />
+        </div>
+      )}
       <div className="now-main">
         <div className="now-head">
-          <span className="now-kicker">{active ? 'Şu an' : lateMin > START_GRACE_MIN ? 'Sıra bunda' : 'Başlama zamanı'}</span>
+          <span className="now-kicker" style={pomo?.phase.kind === 'break' ? { color: BREAK_COLOR } : undefined}>
+            {kicker}
+          </span>
           <h1 className="now-title">{item.label}</h1>
           <span className="now-time num">
             {fmt(item.start)} – {fmt(item.end)} · {fmtDuration(item.duration)}
           </span>
           {phaseLabel && <span className="pill" style={{ alignSelf: 'flex-start' }}>{phaseLabel}</span>}
         </div>
-        <Ring size={124} stroke={10} progress={active ? ringProgress : 1} color={active ? type.color : '#fbbf24'}>
-          <span className="ring-big num">{active ? fmtClock(ringSec) : `+${lateMin}`}</span>
-          <span className="ring-small">{ringLabel}</span>
-        </Ring>
+        {!pomo && (
+          <Ring size={124} stroke={10} progress={active ? progress : 1} color={active ? type.color : '#fbbf24'}>
+            <span className="ring-big num">{active ? fmtClock(leftSec) : `+${lateMin}`}</span>
+            <span className="ring-small">{ringLabel}</span>
+          </Ring>
+        )}
       </div>
 
       {!active && (

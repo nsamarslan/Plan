@@ -49,11 +49,13 @@ export function useFocusAudioController(
   current: ResolvedItem | undefined,
   status: EffectiveStatus | undefined,
   dateKey: string,
+  /** Pomodoro break: step away, so music and cues pause until the next focus. */
+  inBreak = false,
 ) {
   const muted = useAudioMuted();
   const test = useAudioTest();
   const key = current ? `${dateKey}|${current.id}` : 'free';
-  const wanted = (audioWanted(settings, current, status) && muted !== key) || test;
+  const wanted = (audioWanted(settings, current, status) && muted !== key && !inBreak) || test;
   const label = current?.label ?? (test ? 'DSA' : '');
 
   useEffect(() => {

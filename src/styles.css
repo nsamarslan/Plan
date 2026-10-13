@@ -460,3 +460,11 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
   40% { transform: scale(1); }
   100% { transform: scale(0.55); }
 }
+
+/* pomodoro: the remaining-time pie is the hero while a focus block runs */
+.pomo-hero { display: flex; justify-content: center; }
+.pie-timer { width: min(66vw, 38vh, 300px); height: auto; display: block; filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.45)); }
+.now--pomo .now-art { opacity: 0.3; }
+@media (orientation: landscape) {
+  .pomo-hero { justify-content: flex-start; }
+}

@@ -17,7 +17,7 @@ export type ArtKey =
 /**
  * How the "Şimdi" screen runs a block:
  * - timer: plain countdown
- * - pomodoro: 50 min focus / 10 min break cycles inside the block
+ * - pomodoro: focus / break cycles inside the block (focusMin / breakMin)
  * - tilt: guided pelvis routine (step by step, with timers)
  * - meditation: breathing circle + countdown
  * - walk: countdown + "turn back" cue at half time
@@ -43,6 +43,9 @@ export interface BlockType {
   focusAudio: boolean;
   /** Extra Android packages allowed while this block locks the phone. */
   allowedApps: string[];
+  /** Pomodoro lengths (mode 'pomodoro'); default 50 / 10. */
+  focusMin?: number;
+  breakMin?: number;
   /** "Sıradaki" – what to pick up next time; shown on the Şimdi screen. */
   note: string;
   tips?: string[];

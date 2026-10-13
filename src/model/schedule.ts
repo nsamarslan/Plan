@@ -271,20 +271,71 @@ export function clearOverride(day: DayDoc, id: string): DayDoc {
   return { ...day, overrides };
 }
 
-/** Pomodoro phases inside a block: 50 focus / 10 break, last phase may be shorter. */
-export function pomodoroPhases(duration: number): { kind: 'focus' | 'break'; start: number; end: number }[] {
-  const out: { kind: 'focus' | 'break'; start: number; end: number }[] = [];
+export const DEFAULT_FOCUS_MIN = 50;
+export const DEFAULT_BREAK_MIN = 10;
+
+export interface PomodoroPhase {
+  kind: 'focus' | 'break';
+  /** Minutes from the block start. */
+  start: number;
+  end: number;
+}
+
+/** Focus / break minutes for a block type (defaults 50 / 10). */
+export function pomodoroLengths(type: Pick<BlockType, 'focusMin' | 'breakMin'>): { focus: number; brk: number } {
+  const focus = Number.isFinite(type.focusMin) && type.focusMin! >= 5 ? Math.round(type.focusMin!) : DEFAULT_FOCUS_MIN;
+  const brk = Number.isFinite(type.breakMin) && type.breakMin! >= 0 ? Math.round(type.breakMin!) : DEFAULT_BREAK_MIN;
+  return { focus, brk };
+}
+
+/** Pomodoro phases inside a block; the last phase may be shorter. A 0-minute break means one long focus. */
+export function pomodoroPhases(duration: number, focus = DEFAULT_FOCUS_MIN, brk = DEFAULT_BREAK_MIN): PomodoroPhase[] {
+  const out: PomodoroPhase[] = [];
+  const f = Math.max(5, focus);
   let t = 0;
   while (t < duration) {
-    const fEnd = Math.min(duration, t + 50);
+    const fEnd = brk > 0 ? Math.min(duration, t + f) : duration;
     out.push({ kind: 'focus', start: t, end: fEnd });
     t = fEnd;
     if (t >= duration) break;
-    const bEnd = Math.min(duration, t + 10);
+    const bEnd = Math.min(duration, t + brk);
     out.push({ kind: 'break', start: t, end: bEnd });
     t = bEnd;
   }
   return out;
+}
+
+export interface PomodoroState {
+  phases: PomodoroPhase[];
+  index: number;
+  phase: PomodoroPhase;
+  /** 1-based number of the current (or last) focus phase, and how many there are. */
+  focusNo: number;
+  focusTotal: number;
+  /** Seconds left in the current phase / in the whole block. */
+  phaseLeftSec: number;
+  phaseTotalSec: number;
+  elapsedMin: number;
+}
+
+/** Where a pomodoro block is at `nowMs` (phases are counted from the block's planned start). */
+export function pomodoroAt(item: ResolvedItem, date: DateKey, nowMs: number): PomodoroState {
+  const { focus, brk } = pomodoroLengths(item.type);
+  const phases = pomodoroPhases(item.duration, focus, brk);
+  const elapsedMin = Math.min(item.duration, Math.max(0, (nowMs - msAt(date, item.start)) / 60_000));
+  let index = phases.findIndex((p) => elapsedMin >= p.start && elapsedMin < p.end);
+  if (index < 0) index = phases.length - 1;
+  const phase = phases[index];
+  return {
+    phases,
+    index,
+    phase,
+    focusNo: phases.slice(0, index + 1).filter((p) => p.kind === 'focus').length,
+    focusTotal: phases.filter((p) => p.kind === 'focus').length,
+    phaseLeftSec: Math.max(0, (phase.end - elapsedMin) * 60),
+    phaseTotalSec: (phase.end - phase.start) * 60,
+    elapsedMin,
+  };
 }
 
 export function uid(prefix = 'x'): string {
