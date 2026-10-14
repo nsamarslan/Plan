@@ -104,13 +104,15 @@ export function cleanDay(date: DateKey, v: unknown): DayDoc | null {
       const log: ItemLog = { status: l.status as ItemLog['status'] };
       if (isNum(l.startedAt)) log.startedAt = l.startedAt;
       if (isNum(l.endedAt)) log.endedAt = l.endedAt;
+      if (log.status === 'active' && isNum(l.pausedAt)) log.pausedAt = l.pausedAt;
+      if (isNum(l.pausedMs) && l.pausedMs > 0) log.pausedMs = l.pausedMs;
       logs[id] = log;
     }
   }
   const tpl = v.tpl === undefined ? null : cleanTemplate(v.tpl);
   return {
     date,
-    mode: v.mode === 'minimal' ? 'minimal' : 'normal',
+    mode: v.mode === 'minimal' || v.mode === 'off' ? v.mode : 'normal',
     overrides,
     extras: cleanTemplate(v.extras) ?? [],
     logs,
@@ -123,9 +125,11 @@ function cleanSettings(v: unknown): Settings {
   const d = defaultSettings();
   if (!isObj(v)) return d;
   const s = { ...d, ...v } as Settings;
-  for (const k of ['wake', 'sleep', 'preWarnMin', 'remindEveryMin', 'remindCount'] as const) {
+  for (const k of ['wake', 'sleep', 'preWarnMin', 'remindEveryMin', 'remindCount', 'weeklySummaryAt'] as const) {
     if (!isNum(s[k])) s[k] = d[k];
   }
+  s.weeklySummaryAt = Math.min(Math.max(0, Math.round(s.weeklySummaryAt)), DAY_MIN - 1);
+  if (typeof s.weeklySummary !== 'boolean') s.weeklySummary = d.weeklySummary;
   s.wake = Math.min(Math.max(0, s.wake), DAY_MIN - 1);
   s.sleep = Math.min(Math.max(0, s.sleep), DAY_MIN - 1);
   s.dndRanges = Array.isArray(s.dndRanges)

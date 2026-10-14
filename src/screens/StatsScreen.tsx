@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { cssVars, Segmented } from '../components/ui';
 import { addDays, dateKey, daysBetween, fmtDateLong, fmtDuration, weekday, WEEKDAYS_SHORT } from '../lib/time';
 import { effectiveStatus, resolveDay } from '../model/schedule';
-import { pct, rangeStats, streak } from '../model/stats';
+import { pct, rangeStats, streak, weekStart, weekSummary } from '../model/stats';
 import { phaseFor, PROGRAM_DAYS, programDay } from '../model/tilt';
 import { firstDay, useAppState } from '../store/store';
 
@@ -39,6 +39,12 @@ export function StatsScreen({ now }: { now: number }) {
     { planned: 0, done: 0, doneMin: 0 },
   );
   const pickedDay = week.days.find((d) => d.date === picked) ?? t;
+  // Monday to now; the same numbers as the Sunday evening notification.
+  const thisWeek = useMemo(() => {
+    const monday = weekStart(today);
+    const base = { nowMs: minuteNow, template: s.template, types: s.types, dayDocs: s.days, since };
+    return { cur: weekSummary({ ...base, monday }), prev: weekSummary({ ...base, monday: addDays(monday, -7) }) };
+  }, [today, minuteNow, s, since]);
 
   // Pelvis program: one dot per program day, filled when the tilt block was done.
   const tiltDay = programDay(s.settings.tiltStartDate, today);
@@ -65,7 +71,7 @@ export function StatsScreen({ now }: { now: number }) {
 
       <div className="kpis">
         <div className="kpi">
-          <b className="num">%{pct(t.done, t.planned)}</b>
+          <b className="num">{t.off ? 'Off' : `%${pct(t.done, t.planned)}`}</b>
           <span>Bugün</span>
         </div>
         <div className="kpi">
@@ -80,12 +86,36 @@ export function StatsScreen({ now }: { now: number }) {
 
       <div className="card">
         <div className="card-h">
+          <h2>Bu hafta</h2>
+          {thisWeek.cur.judged > 0 && <span className="pill num">%{thisWeek.cur.pct} uyum</span>}
+        </div>
+        {thisWeek.cur.judged ? (
+          <p className="sub num">
+            {thisWeek.cur.done}/{thisWeek.cur.judged} blok · {fmtDuration(thisWeek.cur.doneMin)}
+            {thisWeek.cur.worst ? ` · en çok kaçan: ${thisWeek.cur.worst.type.name} (${thisWeek.cur.worst.missed})` : ''}
+            {thisWeek.prev.judged ? ` · geçen hafta %${thisWeek.prev.pct}` : ''}
+            {thisWeek.cur.offDays ? ` · ${thisWeek.cur.offDays} gün off` : ''}
+          </p>
+        ) : (
+          <p className="muted">Bu hafta henüz değerlendirilecek blok yok.</p>
+        )}
+        {s.settings.weeklySummary && <p className="muted" style={{ margin: 0 }}>Pazar akşamı bu özet bildirim olarak da gelir.</p>}
+      </div>
+
+      <div className="card">
+        <div className="card-h">
           <h2>Son 7 gün</h2>
         </div>
         <p className="sub num">
-          {fmtDateLong(pickedDay.date)}: {pickedDay.done}/{pickedDay.planned} blok · %{pct(pickedDay.done, pickedDay.planned)} ·{' '}
-          {fmtDuration(pickedDay.doneMin)}
-          {pickedDay.missed ? ` · ${pickedDay.missed} kaçtı` : ''}
+          {fmtDateLong(pickedDay.date)}:{' '}
+          {pickedDay.off ? (
+            'off gün'
+          ) : (
+            <>
+              {pickedDay.done}/{pickedDay.planned} blok · %{pct(pickedDay.done, pickedDay.planned)} · {fmtDuration(pickedDay.doneMin)}
+              {pickedDay.missed ? ` · ${pickedDay.missed} kaçtı` : ''}
+            </>
+          )}
         </p>
         <div className="bars" role="list">
           {week.days.map((d) => {
@@ -96,11 +126,11 @@ export function StatsScreen({ now }: { now: number }) {
                 className="bar"
                 role="listitem"
                 style={{ background: 'none', border: 0, padding: 0 }}
-                aria-label={`${fmtDateLong(d.date)}: yüzde ${p}`}
+                aria-label={`${fmtDateLong(d.date)}: ${d.off ? 'off gün' : `yüzde ${p}`}`}
                 onClick={() => setPicked(d.date)}
               >
-                <span className="bar-track" style={{ outline: d.date === pickedDay.date ? '2px solid var(--ink-3)' : 'none' }}>
-                  <span className="bar-fill" style={{ height: `${p}%`, background: BAR }} />
+                <span className={`bar-track ${d.off ? 'bar-off' : ''}`} style={{ outline: d.date === pickedDay.date ? '2px solid var(--ink-3)' : 'none' }}>
+                  {d.off ? <em>off</em> : <span className="bar-fill" style={{ height: `${p}%`, background: BAR }} />}
                 </span>
                 <small style={{ color: d.date === today ? 'var(--ink)' : undefined }}>{WEEKDAYS_SHORT[weekday(d.date)]}</small>
               </button>

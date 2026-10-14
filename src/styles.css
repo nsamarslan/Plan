@@ -422,6 +422,9 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 .bar-fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--good); border-radius: 8px; }
 .bar small { font-size: 0.72rem; color: var(--ink-3); font-weight: 700; }
 .bar em { font-style: normal; font-size: 0.72rem; color: var(--ink-2); font-weight: 700; }
+/* A day off: striped, not an empty (failed) bar. */
+.bar-off { display: flex; align-items: center; justify-content: center; background: repeating-linear-gradient(135deg, var(--bg-3) 0 6px, transparent 6px 12px); }
+.bar-off em { color: #34d399; writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: 0.1em; }
 .hbar { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
 .hbar-track { grid-column: 1 / -1; height: 8px; background: var(--bg-3); border-radius: 6px; overflow: hidden; }
 .hbar-track i { display: block; height: 100%; background: var(--c); border-radius: 6px; }

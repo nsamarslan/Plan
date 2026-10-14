@@ -2,23 +2,29 @@ import { useEffect, useMemo, useState } from 'react';
 import { setAudioMuted } from '../audio/controller';
 import { BREAK_COLOR, PieTimer } from '../components/PieTimer';
 import { QUICK_COLOR, quickDuration, quickEndsAt, quickLabel, quickState, type QuickSession } from '../model/quick';
-import { stopQuick, useQuickSession } from '../store/quick';
+import { pauseQuick, resumeQuick, stopQuick, useQuickSession } from '../store/quick';
 import { QuickPomodoroSheet } from './QuickPomodoroSheet';
 import { TiltGuide } from '../components/TiltGuide';
 import { artUrl, cssVars, Icon, Ring, Sheet } from '../components/ui';
 import { useWakeLock } from '../hooks/useWakeLock';
-import { addDays, dateKey, DAY_MIN, daysBetween, fmt, fmtClock, fmtDuration, minutesOfDay, msAt, MIN_MS } from '../lib/time';
+import { addDays, dateKey, fmt, fmtClock, fmtDuration, minutesOfDay, msAt, MIN_MS } from '../lib/time';
 import { DAILY_HABITS } from '../model/defaults';
 import { activeFocus, buildFocusWindows } from '../model/notify';
 import {
+  extendItem,
   finishItem,
+  isOffDay,
   nowStateAround,
-  postponeItem,
+  pauseItem,
   pomodoroAt,
   resolveDay,
+  resumeItem,
   skipItem,
+  SNOOZE_MIN,
+  snoozeItem,
   START_GRACE_MIN,
   startItem,
+  workMinutes,
 } from '../model/schedule';
 import { dayStats } from '../model/stats';
 import { programDay } from '../model/tilt';
@@ -26,6 +32,9 @@ import type { ArtKey, EffectiveStatus, ResolvedItem } from '../model/types';
 import { isNative } from '../native/plan';
 import { planInput } from '../services/scheduler';
 import { updateDay, updateType, useAppState } from '../store/store';
+
+const OFF_COLOR = '#34d399';
+const PAUSE_COLOR = '#fbbf24';
 
 interface Props {
   now: number;
@@ -81,9 +90,13 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
   // Bedtime may be after midnight (e.g. 00:30), then the night wraps around.
   const night = sleep > wake ? nowMin < wake || nowMin >= sleep : nowMin >= sleep && nowMin < wake;
   const asleep = !current && night;
-  const dayOver = !current && !next && !asleep;
+  // A day off: no plan on screen (yesterday's late block may still finish).
+  const off = isOffDay(s.days[today]);
+  const offNow = !current && !asleep && off;
+  const dayOver = !current && !next && !asleep && !off;
   const tomorrowFirst = useMemo(() => {
     const date = nowMin >= s.settings.wake ? addDays(today, 1) : today;
+    if (isOffDay(s.days[date])) return undefined;
     return resolveDay(date, s.template, s.types, s.days[date]).find((i) => i.type.tracked);
   }, [nowMin, s, today]);
 
@@ -97,17 +110,25 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
   } else if (asleep || dayOver) {
     art = 'sleep';
     color = '#6366f1';
+  } else if (offNow) {
+    color = OFF_COLOR;
   }
 
   const top = (
     <div className="now-top">
       <span className="now-clock num">{fmt(nowMin)}</span>
-      <span className="pill num" title="Bugün tamamlanan bloklar">
-        {stats.done}/{stats.planned}
-      </span>
+      {off ? (
+        <span className="pill">Off gün</span>
+      ) : (
+        <span className="pill num" title="Bugün tamamlanan bloklar">
+          {stats.done}/{stats.planned}
+        </span>
+      )}
       {focus && (
-        <span className="pill focus-pill">
-          <Icon name="lock" /> {focus.label} · {fmt(minutesOfDay(new Date(focus.end)))}
+        <span className="pill focus-pill" title={`Odak modu: ${focus.label}`}>
+          {/* A block's name is already on screen; a time range (e.g. "Gece") says its own. */}
+          <Icon name="lock" /> {focus.itemKey ? '' : `${focus.label} · `}
+          {fmt(minutesOfDay(new Date(focus.end)))}
         </span>
       )}
       <span className="spacer" />
@@ -167,6 +188,8 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
           />
         ) : asleep || dayOver ? (
           <Sleep dayOver={dayOver} sleepAt={s.settings.sleep} first={tomorrowFirst} />
+        ) : offNow ? (
+          <OffDay today={today} first={tomorrowFirst} onQuick={() => setQuickOpen(true)} />
         ) : (
           <Free next={next} items={items} today={today} now={now} onQuick={() => setQuickOpen(true)} />
         )}
@@ -216,21 +239,24 @@ function Current({
   const s = useAppState();
   const startMs = msAt(today, item.start);
   const endMs = msAt(today, item.end);
-  const leftSec = (endMs - now) / 1000;
-  const progress = (now - startMs) / (endMs - startMs);
-  const lateMin = Math.floor((now - startMs) / MIN_MS);
   const active = status === 'active';
+  // Paused: the clock stands still at the moment of the pause.
+  const pausedAt = active ? item.log.pausedAt : undefined;
+  const paused = pausedAt !== undefined;
+  const clock = pausedAt ?? now;
+  const leftSec = (endMs - clock) / 1000;
+  const progress = 1 - leftSec / (workMinutes(item) * 60);
+  const lateMin = Math.floor((now - startMs) / MIN_MS);
+  const pauseMin = paused ? Math.floor((now - pausedAt) / MIN_MS) : 0;
   const type = item.type;
 
   const start = () => updateDay(today, (d) => startItem(d, items, item.id, Date.now()));
   const finish = () => updateDay(today, (d) => finishItem(d, item.id, Date.now()));
   const skip = () => updateDay(today, (d) => skipItem(d, item.id));
-  const later = () => {
-    // Minutes on this block's own day (past 24:00 if it started yesterday).
-    const t = new Date();
-    const nowMin = daysBetween(today, dateKey(t)) * DAY_MIN + minutesOfDay(t);
-    updateDay(today, (d) => postponeItem(d, items, item.id, Math.ceil(nowMin) + 15));
-  };
+  const later = () => updateDay(today, (d) => snoozeItem(d, items, item.id, Date.now()));
+  const pause = () => updateDay(today, (d) => pauseItem(d, item.id, Date.now()));
+  const resume = () => updateDay(today, (d) => resumeItem(d, items, item.id, Date.now()));
+  const extend = () => updateDay(today, (d) => extendItem(d, items, item.id, Date.now()));
 
   if (active && type.mode === 'tilt') {
     return (
@@ -243,10 +269,13 @@ function Current({
 
   // Phase inside the block (pomodoro focus/break, walk turnaround).
   let phaseLabel = '';
-  const ringLabel = active ? 'kaldı' : `${lateMin} dk geçti`;
+  const ringLabel = paused ? 'durdu' : active ? 'kaldı' : `${lateMin} dk geçti`;
   const pomo = active && type.mode === 'pomodoro' ? pomodoroAt(item, today, now) : null;
   let kicker = active ? 'Şu an' : lateMin > START_GRACE_MIN ? 'Sıra bunda' : 'Başlama zamanı';
-  if (pomo) {
+  if (paused) {
+    kicker = 'Duraklatıldı';
+    phaseLabel = pauseMin ? `${pauseMin} dk ara` : 'Ara verdin';
+  } else if (pomo) {
     const brk = pomo.phase.kind === 'break';
     const after = pomo.phases[pomo.index + 1];
     kicker = brk ? 'Mola' : `Odak ${pomo.focusNo}/${pomo.focusTotal}`;
@@ -256,7 +285,7 @@ function Current({
         ? `Sonra ${after.end - after.start} dk ${after.kind === 'break' ? 'mola' : 'odak'}`
         : 'Son odak';
   } else if (active && type.mode === 'walk') {
-    const turnAt = startMs + Math.floor(item.duration / 2) * MIN_MS;
+    const turnAt = startMs + (item.log.pausedMs ?? 0) + Math.floor(workMinutes(item) / 2) * MIN_MS;
     phaseLabel = now < turnAt ? `Dönüş: ${fmt(minutesOfDay(new Date(turnAt)))}` : 'Eve doğru dön';
   }
   const tips = type.tips ?? [];
@@ -264,7 +293,7 @@ function Current({
 
   return (
     <>
-      {active && type.mode === 'meditation' && <div className="breath breath-loop" />}
+      {active && !paused && type.mode === 'meditation' && <div className="breath breath-loop" />}
       {pomo && (
         <div className="pomo-hero">
           <PieTimer
@@ -276,13 +305,16 @@ function Current({
             phases={pomo.phases}
             blockMin={item.duration}
             elapsedMin={pomo.elapsedMin}
-            label={pomo.phase.kind === 'break' ? 'MOLA' : `ODAK ${pomo.focusNo}/${pomo.focusTotal}`}
+            label={paused ? 'DURDU' : pomo.phase.kind === 'break' ? 'MOLA' : `ODAK ${pomo.focusNo}/${pomo.focusTotal}`}
           />
         </div>
       )}
       <div className="now-main">
         <div className="now-head">
-          <span className="now-kicker" style={pomo?.phase.kind === 'break' ? { color: BREAK_COLOR } : undefined}>
+          <span
+            className="now-kicker"
+            style={paused ? { color: PAUSE_COLOR } : pomo?.phase.kind === 'break' ? { color: BREAK_COLOR } : undefined}
+          >
             {kicker}
           </span>
           <h1 className="now-title">{item.label}</h1>
@@ -292,7 +324,7 @@ function Current({
           {phaseLabel && <span className="pill" style={{ alignSelf: 'flex-start' }}>{phaseLabel}</span>}
         </div>
         {!pomo && (
-          <Ring size={124} stroke={10} progress={active ? progress : 1} color={active ? type.color : '#fbbf24'}>
+          <Ring size={124} stroke={10} progress={active ? progress : 1} color={active && !paused ? type.color : PAUSE_COLOR}>
             <span className="ring-big num">{active ? fmtClock(leftSec) : `+${lateMin}`}</span>
             <span className="ring-small">{ringLabel}</span>
           </Ring>
@@ -305,7 +337,7 @@ function Current({
           {type.firstStep}
         </p>
       )}
-      {active && tip && <p className="now-step">{tip}</p>}
+      {active && !paused && tip && <p className="now-step">{tip}</p>}
       {type.note && (
         <button className="note-line" style={{ background: 'none', border: 0, padding: 0, textAlign: 'left' }} onClick={() => onEditNote(item.typeId)}>
           <Icon name="edit" size={16} />
@@ -316,17 +348,37 @@ function Current({
       )}
 
       <div className="now-actions">
-        {active ? (
-          <div className="row">
-            <button className="btn btn-xl go" onClick={finish}>
+        {paused ? (
+          <>
+            <button className="btn btn-xl go" onClick={resume}>
+              <Icon name="play" /> Devam et
+            </button>
+            <button className="btn btn-ghost" onClick={finish}>
               <Icon name="check" /> Bitti
             </button>
-            {!type.note && (
-              <button className="btn btn-ghost" style={{ minHeight: 64, flex: 'none', width: 64 }} onClick={() => onEditNote(item.typeId)} aria-label="Sıradaki notu">
-                <Icon name="edit" />
+            <span className="muted">Devam edince bu blok ve sonrakiler ara kadar kayar. Ara, çalışma süresine sayılmaz.</span>
+          </>
+        ) : active ? (
+          <>
+            <div className="row">
+              <button className="btn btn-xl go" onClick={finish}>
+                <Icon name="check" /> Bitti
               </button>
-            )}
-          </div>
+              {!type.note && (
+                <button className="btn btn-ghost" style={{ minHeight: 64, flex: 'none', width: 64 }} onClick={() => onEditNote(item.typeId)} aria-label="Sıradaki notu">
+                  <Icon name="edit" />
+                </button>
+              )}
+            </div>
+            <div className="row">
+              <button className="btn btn-ghost" onClick={pause}>
+                <Icon name="pause" /> Duraklat
+              </button>
+              <button className="btn btn-ghost" onClick={extend}>
+                +{SNOOZE_MIN} dk
+              </button>
+            </div>
+          </>
         ) : (
           <>
             <button className="btn btn-xl go" onClick={start}>
@@ -334,7 +386,7 @@ function Current({
             </button>
             <div className="row">
               <button className="btn btn-ghost" onClick={later}>
-                15 dk sonra
+                {SNOOZE_MIN} dk sonra
               </button>
               <button className="btn btn-ghost" onClick={skip}>
                 <Icon name="skip" /> Atla
@@ -440,9 +492,11 @@ function QuickCurrent({
     return () => clearTimeout(t);
   }, [confirmStop]);
   const st = quickState(session, now);
+  const paused = session.pausedAt !== undefined;
   const brk = st.phase.kind === 'break';
   const after = st.phases[st.index + 1];
-  const roundLabel = brk ? 'Mola' : `Odak ${st.focusNo}/${st.focusTotal}`;
+  const roundLabel = paused ? 'Duraklatıldı' : brk ? 'Mola' : `Odak ${st.focusNo}/${st.focusTotal}`;
+  const pauseMin = paused ? Math.floor((now - session.pausedAt!) / MIN_MS) : 0;
   return (
     <>
       <div className="pomo-hero">
@@ -455,31 +509,51 @@ function QuickCurrent({
           phases={st.phases}
           blockMin={quickDuration(session)}
           elapsedMin={st.elapsedMin}
-          label={roundLabel.toLocaleUpperCase('tr')}
+          label={(paused ? 'Durdu' : roundLabel).toLocaleUpperCase('tr')}
         />
       </div>
       <div className="now-main">
         <div className="now-head">
-          <span className="now-kicker" style={{ color: brk ? BREAK_COLOR : QUICK_COLOR }}>
+          <span className="now-kicker" style={{ color: paused ? PAUSE_COLOR : brk ? BREAK_COLOR : QUICK_COLOR }}>
             {roundLabel}
           </span>
           <h1 className="now-title">{quickLabel(session)}</h1>
           <span className="now-time num">
-            {session.focus}/{session.brk} · {session.rounds} tur · bitiş {fmt(minutesOfDay(new Date(quickEndsAt(session))))}
+            {session.focus}/{session.brk} · {session.rounds} tur · bitiş {fmt(minutesOfDay(new Date(quickEndsAt(session, now))))}
           </span>
           <span className="pill" style={{ alignSelf: 'flex-start' }}>
-            {brk ? 'Kalk, su iç, ekrana bakma' : after ? `Sonra ${after.end - after.start} dk ${after.kind === 'break' ? 'mola' : 'odak'}` : 'Son odak'}
+            {paused
+              ? pauseMin
+                ? `${pauseMin} dk ara`
+                : 'Ara verdin'
+              : brk
+                ? 'Kalk, su iç, ekrana bakma'
+                : after
+                  ? `Sonra ${after.end - after.start} dk ${after.kind === 'break' ? 'mola' : 'odak'}`
+                  : 'Son odak'}
           </span>
         </div>
       </div>
       <div className="now-actions">
-        <button
-          className={`btn ${confirmStop ? 'btn-danger' : 'btn-ghost'}`}
-          style={{ minHeight: 56 }}
-          onClick={() => (confirmStop ? stopQuick() : setConfirmStop(true))}
-        >
-          <Icon name="stop" /> {confirmStop ? 'Bitirmek için tekrar dokun' : 'Pomodoroyu bitir'}
-        </button>
+        {paused && (
+          <button className="btn btn-xl go" style={cssVars({ '--c': QUICK_COLOR })} onClick={() => resumeQuick()}>
+            <Icon name="play" /> Devam et
+          </button>
+        )}
+        <div className="row">
+          {!paused && (
+            <button className="btn btn-ghost" style={{ minHeight: 56 }} onClick={() => pauseQuick()}>
+              <Icon name="pause" /> Duraklat
+            </button>
+          )}
+          <button
+            className={`btn ${confirmStop ? 'btn-danger' : 'btn-ghost'}`}
+            style={{ minHeight: 56 }}
+            onClick={() => (confirmStop ? stopQuick() : setConfirmStop(true))}
+          >
+            <Icon name="stop" /> {confirmStop ? 'Tekrar dokun' : 'Bitir'}
+          </button>
+        </div>
       </div>
       {planNow ? (
         <div className="now-next" style={cssVars({ '--nc': planNow.type.color })}>
@@ -490,6 +564,37 @@ function QuickCurrent({
         </div>
       ) : (
         <NextLine next={next} />
+      )}
+    </>
+  );
+}
+
+/** A day off: nothing planned, nothing tracked. */
+function OffDay({ today, first, onQuick }: { today: string; first?: ResolvedItem; onQuick: () => void }) {
+  return (
+    <>
+      <div className="now-head">
+        <span className="now-kicker" style={{ color: OFF_COLOR }}>
+          Off gün
+        </span>
+        <h1 className="now-title">Bugün senin</h1>
+        <span className="now-time">Plan, bildirim ve takip kapalı. Hiçbir şeyi kaçırmıyorsun.</span>
+      </div>
+      <div className="now-actions">
+        <button className="btn btn-ghost" onClick={onQuick}>
+          <Icon name="timer" /> Pomodoro başlat
+        </button>
+        <button className="btn btn-ghost" onClick={() => updateDay(today, (d) => ({ ...d, mode: 'normal' }))}>
+          Planı geri aç
+        </button>
+      </div>
+      {first && (
+        <div className="now-next" style={cssVars({ '--nc': first.type.color })}>
+          <i />
+          <span>
+            Yarın ilk: <b className="num">{fmt(first.start)}</b> {first.label}
+          </span>
+        </div>
       )}
     </>
   );

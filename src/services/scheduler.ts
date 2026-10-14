@@ -1,7 +1,7 @@
 import { App } from '@capacitor/app';
 import { dateKey } from '../lib/time';
-import { buildEvents, buildFocusWindows, type FocusWindow, type NotifyEvent, type PlanInput } from '../model/notify';
-import { finishItem, resolveDay, skipItem, startItem } from '../model/schedule';
+import { buildEvents, buildFocusWindows, buildSlots, type FocusWindow, type NotifyEvent, type PlanInput } from '../model/notify';
+import { extendItem, finishItem, resolveDay, skipItem, snoozeItem, startItem } from '../model/schedule';
 import { isNative, PlanNative, type NativeAction } from '../native/plan';
 import { getState, getDay, subscribe, updateDay } from '../store/store';
 import { getQuickSession, subscribeQuick } from '../store/quick';
@@ -45,11 +45,12 @@ async function push() {
     windows.sort((a, b) => a.start - b.start);
   }
   if (isNative) {
-    const sig = JSON.stringify([events, windows]);
+    const slots = buildSlots(input);
+    const sig = JSON.stringify([events, windows, slots]);
     if (sig === lastSig) return;
     lastSig = sig;
     try {
-      await PlanNative.setSchedule({ events, windows });
+      await PlanNative.setSchedule({ events, windows, slots });
     } catch (e) {
       console.warn('setSchedule failed', e);
     }
@@ -90,13 +91,15 @@ export function applyNativeAction(a: NativeAction) {
   if (!it) return;
   // A button tapped on an old notification must not undo what was done in the app since.
   const st = it.log.status;
-  if (a.type === 'start' && st !== 'pending') return;
-  if (a.type === 'skip' && st !== 'pending') return;
-  if (a.type === 'done' && (st === 'done' || st === 'skipped')) return;
+  if ((a.type === 'start' || a.type === 'skip' || a.type === 'snooze') && st !== 'pending') return;
+  if ((a.type === 'done' || a.type === 'extend') && (st === 'done' || st === 'skipped')) return;
   updateDay(date, (d) => {
     if (a.type === 'start') return startItem(d, items, id, a.at);
     if (a.type === 'skip') return skipItem(d, id);
     if (a.type === 'done') return finishItem(d, id, a.at);
+    // The phone already shifted its copy the same way; this makes it the plan.
+    if (a.type === 'snooze') return snoozeItem(d, items, id, a.at);
+    if (a.type === 'extend') return extendItem(d, items, id, a.at);
     return d;
   });
 }

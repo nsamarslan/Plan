@@ -79,12 +79,24 @@ export interface ItemLog {
   status: ItemStatus;
   startedAt?: number;
   endedAt?: number;
+  /** Paused since (an interruption): the timer stops, focus mode lets go. */
+  pausedAt?: number;
+  /** Earlier pauses in total. Each one made the block that much longer, so
+   *  real work time = time spent − pausedMs. */
+  pausedMs?: number;
 }
+
+/**
+ * - normal: the plan as is
+ * - minimal: "kötü gün", only the essential blocks
+ * - off: a day off — no notifications, no focus lock, not counted in stats
+ */
+export type DayMode = 'normal' | 'minimal' | 'off';
 
 /** One calendar day: only the differences from the weekly template. */
 export interface DayDoc {
   date: DateKey;
-  mode: 'normal' | 'minimal';
+  mode: DayMode;
   overrides: Record<string, ItemOverride>;
   extras: TemplateItem[];
   logs: Record<string, ItemLog>;
@@ -143,6 +155,9 @@ export interface Settings {
   /** Blocks with focus mode also lock apps (not only silence). */
   lockAppsInDndBlocks: boolean;
   showStreak: boolean;
+  /** Sunday evening summary of the week (moves to Monday morning if Sunday is off). */
+  weeklySummary: boolean;
+  weeklySummaryAt: Minutes;
   tiltStartDate: DateKey;
   audio: AudioSettings;
   supabaseUrl?: string;

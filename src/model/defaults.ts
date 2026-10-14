@@ -267,6 +267,8 @@ export function defaultSettings(): Settings {
     allowedApps: [],
     lockAppsInDndBlocks: true,
     showStreak: false,
+    weeklySummary: true,
+    weeklySummaryAt: hm(20),
     tiltStartDate: dateKey(new Date()),
     audio: defaultAudio(),
   };

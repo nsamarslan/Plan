@@ -4,12 +4,14 @@ DEHB dostu günlük plan uygulaması. Açtığında sadece **şu an ne yapman ge
 
 - **Android uygulaması + web sitesi**, aynı kod, aynı veri (Supabase ile senkron).
 - **Bloklar sabit, saatler esnek:** Okumanın bildirimi, resmi, ilk adımı ve odak ayarı hep aynıdır. Sadece ne zaman yapacağını değiştirirsin.
-- **Bildirimler:** 5 dk önce uyarı, başlangıçta tam ekran resim, başlamazsan 3 dk'da bir tekrar, bitişte bildirim. "Başladım / Atla / Tamamladım" doğrudan bildirimden.
+- **Bildirimler:** 5 dk önce uyarı, başlangıçta tam ekran resim, başlamazsan 3 dk'da bir tekrar, bitişte bildirim. "Başladım / +10 dk / Atla / Tamamladım" doğrudan bildirimden; "+10 dk" uygulamayı açmadan planı kaydırır (başlamadan: blok 10 dk sonraya, bitişte: blok 10 dk uzar, sonrakiler kayar).
 - **Odak modu:** Bildirimler susar; telefon ve WhatsApp aramaları gelir. Diğer uygulamaları açarsan önüne "Odak zamanı" ekranı çıkar. Sabit saat aralığı olarak (ör. gece) ya da bloğa bağlı (DSA, okuma…) çalışır.
 - **Sesli odak:** Arka planda kendi müziğin döngüde çalar. Rastgele aralıklarla "Clear your mind", "They're staring at you again" gibi farkındalık cümleleri söylenir. Cümleler, aralık, ses, dil ve kendi ses kayıtların ayarlanabilir.
 - **Pelvis programı:** 8 haftalık öne eğik pelvis programı, haftaya göre değişen, sayaçlı, adım adım rehber.
-- **Takip:** Günlük ve haftalık uyum, bloklara göre oranlar, pelvis programı ilerlemesi.
-- **Kötü gün modu:** Tek tuşla sadece temel bloklar kalır.
+- **Pomodoro:** Bloğun içinde odak/mola dilimleri ve kalan süre pastası; ya da plandan bağımsız, süreyi seçip hemen başlat.
+- **Duraklat / devam et:** Araya iş girince sayaç durur, odak kilidi ve ses bırakır. Devam edince blok ara kadar uzar; ara çalışma süresine sayılmaz.
+- **Takip:** Günlük ve haftalık uyum, bloklara göre oranlar, pelvis programı ilerlemesi. Pazar akşamı haftalık özet bildirimi (uyum + en çok kaçan blok).
+- **Kötü gün / Off gün:** Kötü günde sadece temel bloklar kalır. Off günde hiç bildirim, odak kilidi ya da takip yok; seriyi de bozmaz.
 
 ## Varsayılan gün
 

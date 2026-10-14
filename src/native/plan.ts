@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import type { FocusWindow, NotifyEvent } from '../model/notify';
+import type { FocusWindow, NotifyEvent, PlanSlot } from '../model/notify';
 
 export interface PermissionState {
   notifications: boolean;
@@ -14,7 +14,8 @@ export interface PermissionState {
 export type PermissionName = keyof PermissionState;
 
 export interface NativeAction {
-  type: 'start' | 'skip' | 'done' | 'unlock';
+  /** snooze: "+10 dk" before a block starts; extend: "+10 dk" at its end. */
+  type: 'start' | 'skip' | 'done' | 'snooze' | 'extend' | 'unlock';
   itemKey?: string;
   at: number;
 }
@@ -39,8 +40,10 @@ export interface VoiceInfo {
 }
 
 interface PlanNativePlugin {
-  setSchedule(opts: { events: NotifyEvent[]; windows: FocusWindow[] }): Promise<void>;
+  setSchedule(opts: { events: NotifyEvent[]; windows: FocusWindow[]; slots: PlanSlot[] }): Promise<void>;
   consumeActions(): Promise<{ actions: NativeAction[] }>;
+  /** The tab a notification asked to open (once). */
+  takeLaunchTab(): Promise<{ tab?: string }>;
   getPermissions(): Promise<PermissionState>;
   requestPermission(opts: { name: PermissionName }): Promise<void>;
   getFocusState(): Promise<FocusState>;

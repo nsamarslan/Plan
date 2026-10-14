@@ -9,7 +9,7 @@ import androidx.core.app.NotificationManagerCompat;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** "Başladım" / "Atla" / "Tamamladım" buttons on notifications. */
+/** "Başladım" / "+10 dk" / "Atla" / "Tamamladım" buttons on notifications. */
 public class ActionReceiver extends BroadcastReceiver {
     static final String ACTION = "com.nsamarslan.plan.ACTION";
     static final String EXTRA_TYPE = "type";
@@ -20,15 +20,24 @@ public class ActionReceiver extends BroadcastReceiver {
         String type = intent.getStringExtra(EXTRA_TYPE);
         String key = intent.getStringExtra(EXTRA_ITEM);
         if (type == null || key == null) return;
-        Store.pushAction(c, type, key);
-        Store.ack(c, key);
+        long now = System.currentTimeMillis();
+        Store.pushAction(c, type, key, now);
         NotificationManagerCompat nm = NotificationManagerCompat.from(c);
         nm.cancel(Notifier.idFor(key, "start"));
         nm.cancel(Notifier.idFor(key, "end"));
         nm.cancel(Notifier.idFor(key, "cue"));
-        if (!"start".equals(type)) {
-            Store.close(c, key);
-            dropItem(c, key);
+        if ("snooze".equals(type)) {
+            // Not acked: its "Şimdi" notification comes again 10 minutes later.
+            Shifter.snooze(c, key, now);
+        } else if ("extend".equals(type)) {
+            Store.ack(c, key);
+            Shifter.extend(c, key, now);
+        } else {
+            Store.ack(c, key);
+            if (!"start".equals(type)) {
+                Store.close(c, key);
+                dropItem(c, key);
+            }
         }
         Scheduler.run(c);
     }

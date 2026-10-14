@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { PAUSE_LIMIT_MIN } from '../model/schedule';
 import { DEFAULT_QUICK, quickEndsAt, type QuickConfig, type QuickSession } from '../model/quick';
 
 // The running standalone pomodoro lives on this device only (it isn't part of
@@ -42,12 +43,19 @@ function cleanConfig(v: Partial<QuickConfig> | null): QuickConfig {
   return c;
 }
 
+/** Over, or paused for so long it was surely forgotten. */
+function isOver(s: QuickSession, nowMs: number, graceMs: number): boolean {
+  if (s.pausedAt !== undefined) return nowMs - s.pausedAt >= PAUSE_LIMIT_MIN * 60_000;
+  return nowMs >= quickEndsAt(s) + graceMs;
+}
+
 function loadSession(): QuickSession | null {
   const s = read<QuickSession>(SESSION_KEY);
   if (!s || typeof s.id !== 'string' || !isNum(s.startedAt, 0, Number.MAX_SAFE_INTEGER)) return null;
-  const session = { ...cleanConfig(s), id: s.id, startedAt: s.startedAt };
+  const session: QuickSession = { ...cleanConfig(s), id: s.id, startedAt: s.startedAt };
+  if (isNum(s.pausedAt, s.startedAt, Number.MAX_SAFE_INTEGER)) session.pausedAt = s.pausedAt;
   // Long over (e.g. the app was closed): forget it.
-  if (Date.now() > quickEndsAt(session) + 60_000) {
+  if (isOver(session, Date.now(), 60_000)) {
     write(SESSION_KEY, null);
     return null;
   }
@@ -90,9 +98,28 @@ export function stopQuick() {
   emit();
 }
 
+function save(next: QuickSession) {
+  session = next;
+  write(SESSION_KEY, session);
+  emit();
+}
+
+/** Something came up: stop the clock (focus lock and phase cues stop too). */
+export function pauseQuick(nowMs = Date.now()) {
+  if (session && session.pausedAt === undefined) save({ ...session, pausedAt: nowMs });
+}
+
+/** Pick up where it stopped: the whole session moves later by the pause. */
+export function resumeQuick(nowMs = Date.now()) {
+  if (!session || session.pausedAt === undefined) return;
+  const next: QuickSession = { ...session, startedAt: session.startedAt + Math.max(0, nowMs - session.pausedAt) };
+  delete next.pausedAt;
+  save(next);
+}
+
 /** Clears a session whose time is up. Returns true if it just ended. */
 export function expireQuick(nowMs = Date.now()): boolean {
-  if (session && nowMs >= quickEndsAt(session)) {
+  if (session && isOver(session, nowMs, 0)) {
     stopQuick();
     return true;
   }

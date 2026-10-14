@@ -64,6 +64,7 @@ public class PlanNativePlugin extends Plugin {
         }
         Store.reopen(getContext(), pending, alive);
         Store.setSchedule(getContext(), events, windows);
+        Store.setSlots(getContext(), call.getArray("slots", new JSArray()));
         new Thread(() -> {
             Scheduler.run(getContext());
             call.resolve();
@@ -79,6 +80,16 @@ public class PlanNativePlugin extends Plugin {
         } catch (JSONException e) {
             r.put("actions", new JSArray());
         }
+        call.resolve(r);
+    }
+
+    /** The tab a tapped notification asked for (e.g. the weekly summary → Takip); once. */
+    @PluginMethod
+    public void takeLaunchTab(PluginCall call) {
+        String tab = MainActivity.pendingTab;
+        MainActivity.pendingTab = null;
+        JSObject r = new JSObject();
+        if (tab != null) r.put("tab", tab);
         call.resolve(r);
     }
 

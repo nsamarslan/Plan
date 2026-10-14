@@ -15,6 +15,7 @@ final class Store {
     private static final String PREFS = "plan_native";
     private static final String EVENTS = "events";
     private static final String WINDOWS = "windows";
+    private static final String SLOTS = "slots";
     private static final String ACKED = "acked";
     private static final String CLOSED = "closed";
     private static final String ACTIONS = "actions";
@@ -38,6 +39,15 @@ final class Store {
 
     static void setSchedule(Context c, JSONArray events, JSONArray windows) {
         prefs(c).edit().putString(EVENTS, events.toString()).putString(WINDOWS, windows.toString()).apply();
+    }
+
+    /** Where each block sits (see Shifter). */
+    static JSONArray slots(Context c) {
+        return array(prefs(c).getString(SLOTS, "[]"));
+    }
+
+    static void setSlots(Context c, JSONArray slots) {
+        prefs(c).edit().putString(SLOTS, slots.toString()).apply();
     }
 
     private static JSONArray array(String s) {
@@ -92,13 +102,18 @@ final class Store {
     }
 
     /** Actions taken from notification buttons, consumed by the web app on resume. */
-    static synchronized void pushAction(Context c, String type, String itemKey) {
+    static void pushAction(Context c, String type, String itemKey) {
+        pushAction(c, type, itemKey, System.currentTimeMillis());
+    }
+
+    /** `at` is the tap time; "+10 dk" counts from it, here and in the app. */
+    static synchronized void pushAction(Context c, String type, String itemKey, long at) {
         JSONArray a = array(prefs(c).getString(ACTIONS, "[]"));
         try {
             JSONObject o = new JSONObject();
             o.put("type", type);
             if (itemKey != null) o.put("itemKey", itemKey);
-            o.put("at", System.currentTimeMillis());
+            o.put("at", at);
             a.put(o);
         } catch (JSONException ignored) {
         }

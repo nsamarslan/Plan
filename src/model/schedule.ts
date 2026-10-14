@@ -1,4 +1,4 @@
-import { addDays, dateKey, DAY_MIN, daysBetween, minutesOfDay, msAt, weekday, type DateKey, type Minutes } from '../lib/time';
+import { addDays, dateKey, DAY_MIN, daysBetween, minutesOfDay, MIN_MS, msAt, wallMinutes, weekday, type DateKey, type Minutes } from '../lib/time';
 import type {
   BlockType,
   DayDoc,
@@ -12,6 +12,9 @@ import type {
 export function emptyDay(date: DateKey): DayDoc {
   return { date, mode: 'normal', overrides: {}, extras: [], logs: {} };
 }
+
+/** A day off: no notifications, no focus lock, not counted in stats. */
+export const isOffDay = (day: DayDoc | undefined) => day?.mode === 'off';
 
 const PENDING: ItemLog = { status: 'pending' };
 
@@ -65,12 +68,19 @@ export function resolveDay(
   return out;
 }
 
+/** A pause this long ends the block by itself (it was most likely forgotten). */
+export const PAUSE_LIMIT_MIN = 180;
+
 export function effectiveStatus(item: ResolvedItem, date: DateKey, nowMs: number): EffectiveStatus {
-  const { status } = item.log;
+  const { status, pausedAt } = item.log;
   if (status === 'done') return 'done';
   if (status === 'skipped') return 'skipped';
   const endMs = msAt(date, item.end);
-  if (status === 'active') return nowMs >= endMs ? 'done' : 'active';
+  if (status === 'active') {
+    // A paused block waits for "Devam et", even past its planned end.
+    if (pausedAt !== undefined) return nowMs - pausedAt < PAUSE_LIMIT_MIN * MIN_MS ? 'active' : 'done';
+    return nowMs >= endMs ? 'done' : 'active';
+  }
   if (nowMs >= endMs) return 'missed';
   return nowMs >= msAt(date, item.start) ? 'late' : 'upcoming';
 }
@@ -114,11 +124,12 @@ export function nowStateAround(
   days: Record<DateKey, DayDoc>,
   nowMs: number,
 ): NowStateAt {
-  const items = resolveDay(today, template, types, days[today]);
+  // An off day has nothing to do; yesterday's late-night block may still run.
+  const items = isOffDay(days[today]) ? [] : resolveDay(today, template, types, days[today]);
   const st = nowState(items, today, nowMs);
   if (st.currentStatus === 'active') return { ...st, currentDate: today };
   const y = addDays(today, -1);
-  const carry = resolveDay(y, template, types, days[y]).filter((i) => i.end > DAY_MIN);
+  const carry = isOffDay(days[y]) ? [] : resolveDay(y, template, types, days[y]).filter((i) => i.end > DAY_MIN);
   const prev = nowState(carry, y, nowMs);
   if (prev.current && (!st.current || prev.currentStatus === 'active')) {
     return { current: prev.current, currentStatus: prev.currentStatus, next: st.next, currentDate: y };
@@ -241,7 +252,72 @@ export function startItem(
 
 export function finishItem(day: DayDoc, id: string, nowMs: number): DayDoc {
   const prev = day.logs[id];
-  return setLog(day, id, { status: 'done', startedAt: prev?.startedAt, endedAt: nowMs });
+  // Finished during a pause: the work stopped when the pause began.
+  const log: ItemLog = { status: 'done', startedAt: prev?.startedAt, endedAt: prev?.pausedAt ?? nowMs };
+  if (prev?.pausedMs) log.pausedMs = prev.pausedMs;
+  return setLog(day, id, log);
+}
+
+/** "Duraklat": something came up. The timer stops and focus mode lets go. */
+export function pauseItem(day: DayDoc, id: string, nowMs: number): DayDoc {
+  const log = day.logs[id];
+  if (!log || log.status !== 'active' || log.pausedAt !== undefined) return day;
+  return setLog(day, id, { ...log, pausedAt: nowMs });
+}
+
+/** "Devam et": the block gets the paused minutes back (later blocks move
+ *  along), and the pause is kept out of the work time. */
+export function resumeItem(day: DayDoc, items: ResolvedItem[], id: string, nowMs: number): DayDoc {
+  const it = items.find((i) => i.id === id);
+  const log = day.logs[id];
+  if (!it || !log || log.status !== 'active' || log.pausedAt === undefined) return day;
+  // Whole minutes, so the extension and the recorded pause always match.
+  const addMin = Math.max(0, Math.round((nowMs - log.pausedAt) / MIN_MS));
+  const next = addMin ? setDuration(day, items, id, it.duration + addMin) : day;
+  const resumed: ItemLog = { ...log, pausedMs: (log.pausedMs ?? 0) + addMin * MIN_MS };
+  delete resumed.pausedAt;
+  return setLog(next, id, resumed);
+}
+
+/** Minutes earlier pauses added to the block. */
+export const pausedMinutes = (log: ItemLog) => (log.pausedMs ?? 0) / MIN_MS;
+
+/** The block's planned work time: its length minus what pauses added. */
+export function workMinutes(item: ResolvedItem): number {
+  return Math.max(5, item.duration - pausedMinutes(item.log));
+}
+
+/** "+10 dk" from a notification or the Şimdi screen. */
+export const SNOOZE_MIN = 10;
+
+/**
+ * Snooze before a block starts: it moves to 10 minutes from now (from its
+ * start, if that is later), and what follows moves along. If the block right
+ * before it is still running, that one gets the extra time instead.
+ */
+export function snoozeItem(day: DayDoc, items: ResolvedItem[], id: string, tapMs: number, min = SNOOZE_MIN): DayDoc {
+  const it = items.find((i) => i.id === id);
+  if (!it) return day;
+  const tap = wallMinutes(day.date, tapMs);
+  const newStart = Math.ceil(Math.max(it.start, tap)) + min;
+  const running = items.find(
+    (o) => o.id !== id && o.log.status === 'active' && o.log.pausedAt === undefined && Math.abs(o.end - it.start) <= 2 && o.start <= tap,
+  );
+  if (running) return setDuration(day, items, running.id, newStart - running.start);
+  return postponeItem(day, items, id, newStart);
+}
+
+/**
+ * More time at the end of a block: it runs 10 more minutes (from now, if it
+ * already ended) and later blocks move along. Asking for more time means you
+ * were on it, so a block never marked as started counts as started.
+ */
+export function extendItem(day: DayDoc, items: ResolvedItem[], id: string, tapMs: number, min = SNOOZE_MIN): DayDoc {
+  const it = items.find((i) => i.id === id);
+  if (!it) return day;
+  const newEnd = Math.ceil(Math.max(it.end, wallMinutes(day.date, tapMs))) + min;
+  const next = setDuration(day, items, id, newEnd - it.start);
+  return it.log.status === 'pending' ? setLog(next, id, { status: 'active', startedAt: msAt(day.date, it.start) }) : next;
 }
 
 export function skipItem(day: DayDoc, id: string): DayDoc {
@@ -318,10 +394,12 @@ export interface PomodoroState {
   elapsedMin: number;
 }
 
-/** Where a pomodoro block is at `nowMs` (phases are counted from the block's planned start). */
+/** Where a pomodoro block is at `nowMs`. Phases are counted from the block's
+ *  planned start over its work time; pauses don't count and freeze it. */
 export function pomodoroAt(item: ResolvedItem, date: DateKey, nowMs: number): PomodoroState {
   const { focus, brk } = pomodoroLengths(item.type);
-  return phaseStateAt(pomodoroPhases(item.duration, focus, brk), msAt(date, item.start), nowMs);
+  const { pausedAt, pausedMs = 0 } = item.log;
+  return phaseStateAt(pomodoroPhases(workMinutes(item), focus, brk), msAt(date, item.start) + pausedMs, pausedAt ?? nowMs);
 }
 
 /** Phase state for any run of phases that started at `startMs`. */

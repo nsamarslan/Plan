@@ -93,6 +93,14 @@ final class Notifier {
         return PendingIntent.getActivity(c, req, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
+    /** Opens the app on another tab (not over the lock screen). */
+    static PendingIntent openTab(Context c, int req, String tab) {
+        Intent i = new Intent(c, MainActivity.class)
+            .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra(MainActivity.EXTRA_TAB, tab);
+        return PendingIntent.getActivity(c, req, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
     private static PendingIntent action(Context c, String type, String itemKey) {
         Intent i = new Intent(c, ActionReceiver.class)
             .setAction(ActionReceiver.ACTION)
@@ -141,18 +149,21 @@ final class Notifier {
             // Alarm category passes our focus-mode policy, which allows alarms; a
             // break or turnaround cue must get through focus mode too.
             .setCategory(loud || "cue".equals(kind) ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
-            .setContentIntent(openApp(c, id));
+            .setContentIntent(e.has("open") ? openTab(c, id, e.optString("open")) : openApp(c, id));
         if (pic != null) {
             b.setLargeIcon(pic);
             b.setStyle(new NotificationCompat.BigPictureStyle().bigPicture(pic).bigLargeIcon((Bitmap) null).setSummaryText(e.optString("body")));
         } else {
             b.setStyle(new NotificationCompat.BigTextStyle().bigText(e.optString("body")));
         }
+        // "+10 dk" shifts the plan right here, without opening the app (see Shifter).
         if (beforeStart) {
             b.addAction(0, "Başladım", action(c, "start", key));
+            b.addAction(0, "+" + Shifter.SNOOZE_MIN + " dk", action(c, "snooze", key));
             b.addAction(0, "Atla", action(c, "skip", key));
         } else if ("end".equals(kind)) {
             b.addAction(0, "Tamamladım", action(c, "done", key));
+            b.addAction(0, "+" + Shifter.SNOOZE_MIN + " dk", action(c, "extend", key));
         }
         if ("start".equals(kind) && e.optBoolean("fullScreen") && canFullScreen(c)) {
             b.setFullScreenIntent(openApp(c, id + 1), true);

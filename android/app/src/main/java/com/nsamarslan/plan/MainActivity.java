@@ -9,6 +9,9 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     static final String EXTRA_FROM_ALARM = "fromAlarm";
+    static final String EXTRA_TAB = "openTab";
+    /** A tab a notification asked for, until the page picks it up (takeLaunchTab). */
+    static volatile String pendingTab;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -17,12 +20,24 @@ public class MainActivity extends BridgeActivity {
         // Background music and spoken cues start without an extra tap.
         getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
         showOverLockScreen(getIntent());
+        openTab(getIntent());
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         showOverLockScreen(intent);
+        openTab(intent);
+    }
+
+    /** Cold start: the page asks for the tab once it loads. Warm start: tell it now. */
+    private void openTab(Intent intent) {
+        String tab = intent == null ? null : intent.getStringExtra(EXTRA_TAB);
+        if (tab == null) return;
+        // Not again when the activity is recreated with the same intent.
+        intent.removeExtra(EXTRA_TAB);
+        pendingTab = tab;
+        if (getBridge() != null) getBridge().triggerWindowJSEvent("planOpenTab");
     }
 
     @Override

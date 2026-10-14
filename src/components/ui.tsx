@@ -42,6 +42,7 @@ const paths: Record<string, ReactNode> = {
   expand: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
   trash: <path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" />,
   play: <path d="M7 5v14l12-7L7 5Z" />,
+  pause: <path d="M8.5 5.5v13M15.5 5.5v13" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
   timer: (
     <>

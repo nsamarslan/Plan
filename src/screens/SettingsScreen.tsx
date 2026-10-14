@@ -83,6 +83,18 @@ function NotifyCard() {
         <span>Kaç kez tekrar etsin</span>
         <NumberInput min={0} max={10} value={s.remindCount} onChange={(v) => v !== undefined && set({ remindCount: v })} />
       </label>
+      <Switch
+        label="Haftalık özet"
+        hint="Pazar akşamı: bu haftaki uyumun ve en çok kaçırdığın blok. Pazar off günse pazartesi sabahı gelir."
+        checked={s.weeklySummary}
+        onChange={(v) => set({ weeklySummary: v })}
+      />
+      {s.weeklySummary && (
+        <label className="field">
+          <span>Pazar saat</span>
+          <TimeInput value={s.weeklySummaryAt} onChange={(v) => set({ weeklySummaryAt: v })} />
+        </label>
+      )}
       {!isNative && perm !== 'granted' && typeof Notification !== 'undefined' && (
         <button className="btn btn-primary" onClick={() => void Notification.requestPermission().then(setPerm)}>
           Tarayıcı bildirimlerine izin ver

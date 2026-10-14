@@ -51,6 +51,13 @@ export function minutesOfDay(d: Date): Minutes {
   return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
 }
 
+/** Wall-clock minutes of `ms` counted from the start of `day` (past 24:00 the
+ *  day after), to the millisecond. DST-safe like daysBetween. */
+export function wallMinutes(day: DateKey, ms: number): Minutes {
+  const d = new Date(ms);
+  return daysBetween(day, dateKey(d)) * DAY_MIN + d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60 + d.getMilliseconds() / MIN_MS;
+}
+
 export function fmt(min: Minutes): string {
   const m = ((Math.round(min) % DAY_MIN) + DAY_MIN) % DAY_MIN;
   return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
