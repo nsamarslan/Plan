@@ -8,6 +8,8 @@ DEHB dostu günlük plan uygulaması. Açtığında sadece **şu an ne yapman ge
 - **Odak modu:** Bildirimler susar; telefon ve WhatsApp aramaları gelir. Diğer uygulamaları açarsan önüne "Odak zamanı" ekranı çıkar. Sabit saat aralığı olarak (ör. gece) ya da bloğa bağlı (DSA, okuma…) çalışır.
 - **Sesli odak:** Arka planda kendi müziğin döngüde çalar. Rastgele aralıklarla "Clear your mind", "They're staring at you again" gibi farkındalık cümleleri söylenir. Cümleler, aralık, ses, dil ve kendi ses kayıtların ayarlanabilir.
 - **Pelvis programı:** 8 haftalık öne eğik pelvis programı, haftaya göre değişen, sayaçlı, adım adım rehber.
+- **Antrenman kaydı:** Ağırlık bloğunda her hareketin set satırları (kg × tekrar). Gri öneriler geçen seferden gelir (barbell'de tüm setlerde üst tekrara ulaştıysan +2.5 kg). ✓ dinlenme sayacını başlatır, süre bitince telefon çalar (ekran kapalıyken de). Dinlenme süresi ve programdaki set sayısı hareket başına hatırlanır; sadece o gün için + Set / − Set.
+- **Tartı, protein, su:** Bugün ekranında tek dokunuşla (+10 g, +0,5 L). Takip ekranında kilo seyri, 7 günlük ortalama ve antrenman geçmişi.
 - **Pomodoro:** Bloğun içinde odak/mola dilimleri ve kalan süre pastası; ya da plandan bağımsız, süreyi seçip hemen başlat.
 - **Duraklat / devam et:** Araya iş girince sayaç durur, odak kilidi ve ses bırakır. Devam edince blok ara kadar uzar; ara çalışma süresine sayılmaz.
 - **Takip:** Günlük ve haftalık uyum, bloklara göre oranlar, pelvis programı ilerlemesi. Pazar akşamı haftalık özet bildirimi (uyum + en çok kaçan blok).

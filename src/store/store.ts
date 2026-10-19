@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { addDays, dateKey, DAY_MIN, daysBetween, weekday, type DateKey } from '../lib/time';
 import { DEFAULT_TYPES, defaultAudio, defaultSettings, defaultTemplate } from '../model/defaults';
 import { emptyDay } from '../model/schedule';
-import type { AudioSettings, BlockType, DayDoc, ItemLog, ItemOverride, Settings, TemplateItem } from '../model/types';
+import type { AudioSettings, BlockType, BodyLog, DayDoc, ExercisePref, ItemLog, ItemOverride, Settings, SetLog, TemplateItem, WorkoutLog } from '../model/types';
 import { toast } from '../services/toast';
 
 // Everything the user owns is a small set of JSON "documents":
@@ -79,6 +79,36 @@ function cleanItem(v: unknown): TemplateItem | null {
   };
 }
 
+const inRange = (v: unknown, min: number, max: number): v is number => isNum(v) && v >= min && v <= max;
+
+function cleanWorkout(v: unknown): WorkoutLog | null {
+  if (!isObj(v) || !isStr(v.name) || !Array.isArray(v.exercises)) return null;
+  const exercises = v.exercises
+    .filter((e): e is Record<string, unknown> => isObj(e) && isStr(e.name) && Array.isArray(e.sets))
+    .map((e) => ({
+      name: e.name as string,
+      reps: isStr(e.reps) ? e.reps : '',
+      restSec: inRange(e.restSec, 5, 3600) ? Math.round(e.restSec) : 90,
+      sets: (e.sets as unknown[]).filter(isObj).map((x) => {
+        const set: SetLog = {};
+        if (inRange(x.kg, 0, 1000)) set.kg = x.kg;
+        if (inRange(x.reps, 0, 1000)) set.reps = Math.round(x.reps);
+        if (x.done === true) set.done = true;
+        return set;
+      }),
+    }));
+  return { name: v.name, exercises };
+}
+
+function cleanBody(v: unknown): BodyLog | null {
+  if (!isObj(v)) return null;
+  const b: BodyLog = {};
+  if (inRange(v.kg, 20, 400)) b.kg = v.kg;
+  if (inRange(v.protein, 0, 1000)) b.protein = Math.round(v.protein);
+  if (inRange(v.water, 0, 20)) b.water = v.water;
+  return Object.keys(b).length ? b : null;
+}
+
 function cleanTemplate(v: unknown): TemplateItem[] | null {
   return Array.isArray(v) ? v.map(cleanItem).filter((x): x is TemplateItem => !!x) : null;
 }
@@ -110,6 +140,8 @@ export function cleanDay(date: DateKey, v: unknown): DayDoc | null {
     }
   }
   const tpl = v.tpl === undefined ? null : cleanTemplate(v.tpl);
+  const workout = cleanWorkout(v.workout);
+  const body = cleanBody(v.body);
   return {
     date,
     mode: v.mode === 'minimal' || v.mode === 'off' ? v.mode : 'normal',
@@ -117,6 +149,8 @@ export function cleanDay(date: DateKey, v: unknown): DayDoc | null {
     extras: cleanTemplate(v.extras) ?? [],
     logs,
     ...(tpl ? { tpl } : {}),
+    ...(workout ? { workout } : {}),
+    ...(body ? { body } : {}),
   };
 }
 
@@ -137,6 +171,17 @@ function cleanSettings(v: unknown): Settings {
     : d.dndRanges;
   s.allowedApps = strings(s.allowedApps);
   if (!isStr(s.tiltStartDate) || !DATE_RE.test(s.tiltStartDate)) s.tiltStartDate = d.tiltStartDate;
+  const prefs: Record<string, ExercisePref> = {};
+  if (isObj(s.exercisePrefs)) {
+    for (const [name, p] of Object.entries(s.exercisePrefs)) {
+      if (!isObj(p)) continue;
+      const pref: ExercisePref = {};
+      if (inRange(p.restSec, 5, 3600)) pref.restSec = Math.round(p.restSec);
+      if (inRange(p.sets, 1, 20)) pref.sets = Math.round(p.sets);
+      if (Object.keys(pref).length) prefs[name] = pref;
+    }
+  }
+  s.exercisePrefs = prefs;
   const da = defaultAudio();
   const a = { ...da, ...(isObj(v.audio) ? v.audio : {}) } as AudioSettings;
   for (const k of ['minSec', 'maxSec', 'musicVolume', 'voiceVolume', 'rate', 'pitch'] as const) {

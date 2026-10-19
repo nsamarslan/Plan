@@ -5,6 +5,7 @@ import { QUICK_COLOR, quickDuration, quickEndsAt, quickLabel, quickState, type Q
 import { pauseQuick, resumeQuick, stopQuick, useQuickSession } from '../store/quick';
 import { QuickPomodoroSheet } from './QuickPomodoroSheet';
 import { TiltGuide } from '../components/TiltGuide';
+import { WorkoutLog } from '../components/WorkoutLog';
 import { artUrl, cssVars, Icon, Ring, Sheet } from '../components/ui';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { addDays, dateKey, fmt, fmtClock, fmtDuration, minutesOfDay, msAt, MIN_MS } from '../lib/time';
@@ -29,12 +30,16 @@ import {
 import { roadmapBadge } from '../model/roadmap';
 import { dayStats } from '../model/stats';
 import { programDay } from '../model/tilt';
-import type { ArtKey, EffectiveStatus, ResolvedItem } from '../model/types';
+import type { ArtKey, BlockMode, EffectiveStatus, ResolvedItem } from '../model/types';
 import { isNative } from '../native/plan';
 import { planInput } from '../services/scheduler';
 import { updateDay, updateType, useAppState } from '../store/store';
 
 const OFF_COLOR = '#34d399';
+
+/** Blocks that take the whole screen while running, and how long past their end they may. */
+const GUIDE_GRACE_MIN: Partial<Record<BlockMode, number>> = { tilt: 30, workout: 60 };
+const isGuided = (m: BlockMode) => GUIDE_GRACE_MIN[m] !== undefined;
 const PAUSE_COLOR = '#fbbf24';
 
 interface Props {
@@ -53,10 +58,10 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
   let { current, currentStatus, currentDate } = st;
   let currentItems = currentDate === today ? items : resolveDay(currentDate, s.template, s.types, s.days[currentDate]);
 
-  // A pelvis routine in progress stays on screen past the block's planned end
-  // (up to 30 min) until "Rutini bitir", instead of vanishing mid-exercise.
+  // A pelvis routine or a workout in progress stays on screen past the block's
+  // planned end (30 / 60 min) until it is finished, instead of vanishing mid-set.
   const [guideKey, setGuideKey] = useState<string | null>(null);
-  const guideOpen = current?.type.mode === 'tilt' && currentStatus === 'active' ? `${currentDate}|${current.id}` : null;
+  const guideOpen = current && isGuided(current.type.mode) && currentStatus === 'active' ? `${currentDate}|${current.id}` : null;
   useEffect(() => {
     if (guideOpen) setGuideKey(guideOpen);
   }, [guideOpen]);
@@ -64,7 +69,7 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
     const [gDate, gId] = guideKey.split('|');
     const gItems = gDate === today ? items : resolveDay(gDate, s.template, s.types, s.days[gDate]);
     const gi = gItems.find((i) => i.id === gId);
-    if (gi && gi.log.status === 'active' && now < msAt(gDate, gi.end) + 30 * MIN_MS) {
+    if (gi && gi.log.status === 'active' && now < msAt(gDate, gi.end) + (GUIDE_GRACE_MIN[gi.type.mode] ?? 0) * MIN_MS) {
       current = gi;
       currentStatus = 'active';
       currentDate = gDate;
@@ -166,7 +171,7 @@ export function NowScreen({ now, onOpenToday, audio }: Props) {
 
   return (
     <div
-      className={`now ${!quick && current?.type.mode === 'tilt' && currentStatus === 'active' ? 'now--guide' : ''} ${
+      className={`now ${!quick && current && isGuided(current.type.mode) && currentStatus === 'active' ? 'now--guide' : ''} ${
         quick || (current?.type.mode === 'pomodoro' && currentStatus === 'active') ? 'now--pomo' : ''
       }`}
       style={cssVars({ '--c': color })}
@@ -258,6 +263,15 @@ function Current({
   const pause = () => updateDay(today, (d) => pauseItem(d, item.id, Date.now()));
   const resume = () => updateDay(today, (d) => resumeItem(d, items, item.id, Date.now()));
   const extend = () => updateDay(today, (d) => extendItem(d, items, item.id, Date.now()));
+
+  if (active && type.mode === 'workout') {
+    return (
+      <>
+        <WorkoutLog date={today} color={type.color} onFinish={finish} />
+        <NextLine next={next} />
+      </>
+    );
+  }
 
   if (active && type.mode === 'tilt') {
     return (

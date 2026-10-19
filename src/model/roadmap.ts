@@ -86,51 +86,52 @@ export function phaseOf(week: number): StudyPhase | undefined {
   return STUDY_PHASES.find((p) => week >= p.from && week <= p.to);
 }
 
-type Move = [name: string, sets: number, reps: string];
+/** Name, sets, target reps, rest between sets (s): main lifts 120, accessories 90, isolation 60. */
+export type Move = [name: string, sets: number, reps: string, restSec: number];
 
 export const WORKOUTS: Record<number, { name: string; moves: Move[] }> = {
   1: {
     name: 'Upper A',
     moves: [
-      ['Barbell Bench Press', 4, '6-8'],
-      ['Barbell Row (yatık)', 4, '6-8'],
-      ['Dumbbell Shoulder Press', 3, '8-10'],
-      ['Pull-up', 3, 'maks'],
-      ['Dumbbell Curl', 3, '10-12'],
-      ['Overhead Triceps Ext. (DB)', 3, '10-12'],
+      ['Barbell Bench Press', 4, '6-8', 120],
+      ['Barbell Row (yatık)', 4, '6-8', 120],
+      ['Dumbbell Shoulder Press', 3, '8-10', 90],
+      ['Pull-up', 3, 'maks', 90],
+      ['Dumbbell Curl', 3, '10-12', 60],
+      ['Overhead Triceps Ext. (DB)', 3, '10-12', 60],
     ],
   },
   2: {
     name: 'Lower A',
     moves: [
-      ['Barbell Back Squat', 4, '6-8'],
-      ['Romanian Deadlift', 3, '8-10'],
-      ['Bulgarian Split Squat (DB)', 3, '8-10/bacak'],
-      ['Standing Calf Raise (DB)', 3, '15-20'],
-      ['Dead Bug', 3, '8/taraf'],
+      ['Barbell Back Squat', 4, '6-8', 120],
+      ['Romanian Deadlift', 3, '8-10', 90],
+      ['Bulgarian Split Squat (DB)', 3, '8-10/bacak', 90],
+      ['Standing Calf Raise (DB)', 3, '15-20', 60],
+      ['Dead Bug', 3, '8/taraf', 60],
     ],
   },
   4: {
     name: 'Upper B',
     moves: [
-      ['Incline Dumbbell Press', 4, '8-10'],
-      ['Pull-up / Lat çekiş', 4, '6-10'],
-      ['Barbell Overhead Press', 3, '6-8'],
-      ['Dumbbell Row (tek kol)', 3, '10-12'],
-      ['Lateral Raise (DB)', 3, '12-15'],
-      ['Hammer Curl', 3, '10-12'],
-      ['Bench Dips / Skullcrusher', 3, '10-12'],
+      ['Incline Dumbbell Press', 4, '8-10', 90],
+      ['Pull-up / Lat çekiş', 4, '6-10', 90],
+      ['Barbell Overhead Press', 3, '6-8', 120],
+      ['Dumbbell Row (tek kol)', 3, '10-12', 90],
+      ['Lateral Raise (DB)', 3, '12-15', 60],
+      ['Hammer Curl', 3, '10-12', 60],
+      ['Bench Dips / Skullcrusher', 3, '10-12', 60],
     ],
   },
   5: {
     name: 'Lower B',
     moves: [
-      ['Barbell Deadlift', 3, '5'],
-      ['Goblet / Front Squat', 3, '8-10'],
-      ['Barbell Hip Thrust (bench)', 3, '8-12'],
-      ['Reverse Lunge (DB)', 3, '10/bacak'],
-      ['Seated/Standing Calf Raise', 3, '15-20'],
-      ['Plank', 3, '30-60 sn'],
+      ['Barbell Deadlift', 3, '5', 120],
+      ['Goblet / Front Squat', 3, '8-10', 90],
+      ['Barbell Hip Thrust (bench)', 3, '8-12', 90],
+      ['Reverse Lunge (DB)', 3, '10/bacak', 90],
+      ['Seated/Standing Calf Raise', 3, '15-20', 60],
+      ['Plank', 3, '30-60 sn', 60],
     ],
   },
 };
@@ -145,11 +146,17 @@ export interface BlockPlan {
 const SAT = 6;
 const SD_DAYS = [1, 3, 5];
 
+/** True before FULL_SETS_FROM: the restart weeks, one set fewer. */
+export const isRampDay = (date: DateKey) => daysBetween(date, FULL_SETS_FROM) > 0;
+
+/** The program's set count for `date` (one fewer during the restart weeks). */
+export const programSets = (date: DateKey, sets: number) => (isRampDay(date) ? Math.max(1, sets - 1) : sets);
+
 function weightsPlan(date: DateKey): BlockPlan | undefined {
   const w = WORKOUTS[weekday(date)];
   if (!w) return undefined;
-  const ramp = daysBetween(date, FULL_SETS_FROM) > 0;
-  const moves = w.moves.map(([name, sets, reps]) => `${name} ${ramp ? sets - 1 : sets}×${reps}`);
+  const ramp = isRampDay(date);
+  const moves = w.moves.map(([name, sets, reps]) => `${name} ${programSets(date, sets)}×${reps}`);
   return {
     label: w.name,
     firstStep: `Kıyafetini giy, suyu doldur, ısın. İlk hareket: ${moves[0]}.`,

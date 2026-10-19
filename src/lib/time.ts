@@ -97,6 +97,12 @@ export const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
+/** "19 Eki" */
+export function fmtDateShort(key: DateKey): string {
+  const d = parseDateKey(key);
+  return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
+}
+
 export function fmtDateLong(key: DateKey): string {
   const d = parseDateKey(key);
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${WEEKDAYS_LONG[d.getDay()]}`;

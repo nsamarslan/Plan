@@ -56,7 +56,7 @@ export const DEFAULT_TYPES: BlockType[] = [
     color: '#f97316',
     art: 'weights',
     firstStep: 'Antrenman kıyafetini giy, suyu doldur, ilk hareketin ağırlığını hazırla.',
-    mode: 'timer',
+    mode: 'workout',
     tracked: true,
     dnd: false,
     notify: true,
@@ -290,6 +290,7 @@ export function defaultSettings(): Settings {
     showStreak: false,
     weeklySummary: true,
     weeklySummaryAt: hm(20),
+    exercisePrefs: {},
     tiltStartDate: dateKey(new Date()),
     audio: defaultAudio(),
   };

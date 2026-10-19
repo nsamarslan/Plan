@@ -21,8 +21,9 @@ export type ArtKey =
  * - tilt: guided pelvis routine (step by step, with timers)
  * - meditation: breathing circle + countdown
  * - walk: countdown + "turn back" cue at half time
+ * - workout: set log (kg × reps per set) with a rest timer between sets
  */
-export type BlockMode = 'timer' | 'pomodoro' | 'tilt' | 'meditation' | 'walk';
+export type BlockMode = 'timer' | 'pomodoro' | 'tilt' | 'meditation' | 'walk' | 'workout';
 
 /** A kind of activity. Its behaviour (notifications, image, focus lock) is fixed;
  *  only *when* it happens lives in the plan. */
@@ -102,6 +103,43 @@ export interface DayDoc {
   logs: Record<string, ItemLog>;
   /** Frozen copy of the weekly template for a past day (see freezePastDays). */
   tpl?: TemplateItem[];
+  /** The day's weight training, set by set (see workout.ts). */
+  workout?: WorkoutLog;
+  /** Body weight (weigh-in day), protein and water. */
+  body?: BodyLog;
+}
+
+/** One set. Empty kg/reps on a done set means "same as suggested". */
+export interface SetLog {
+  kg?: number;
+  reps?: number;
+  done?: boolean;
+}
+
+export interface ExerciseLog {
+  name: string;
+  /** Target reps from the program, e.g. "6-8", "8/taraf", "30-60 sn". */
+  reps: string;
+  restSec: number;
+  sets: SetLog[];
+}
+
+export interface WorkoutLog {
+  /** "Upper A" … */
+  name: string;
+  exercises: ExerciseLog[];
+}
+
+export interface BodyLog {
+  kg?: number;
+  protein?: number;
+  water?: number;
+}
+
+/** Remembered per exercise name: rest length and the program's set count. */
+export interface ExercisePref {
+  restSec?: number;
+  sets?: number;
 }
 
 export interface DndRange {
@@ -158,6 +196,8 @@ export interface Settings {
   /** Sunday evening summary of the week (moves to Monday morning if Sunday is off). */
   weeklySummary: boolean;
   weeklySummaryAt: Minutes;
+  /** Per exercise (by name): rest and set count changed in the workout log. */
+  exercisePrefs: Record<string, ExercisePref>;
   tiltStartDate: DateKey;
   audio: AudioSettings;
   supabaseUrl?: string;

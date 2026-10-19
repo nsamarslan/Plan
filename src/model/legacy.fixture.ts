@@ -215,6 +215,7 @@ export function defaultSettings(): Settings {
     showStreak: false,
     weeklySummary: true,
     weeklySummaryAt: hm(20),
+    exercisePrefs: {},
     tiltStartDate: dateKey(new Date()),
     audio: defaultAudio(),
   };
