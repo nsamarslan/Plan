@@ -44,6 +44,7 @@ final class FocusController {
             JSONObject w = ws.optJSONObject(i);
             if (w == null) continue;
             if (w.optLong("start") > now || w.optLong("end") <= now) continue;
+            if (w.has("itemKey") && Store.isClosed(c, w.optString("itemKey"))) continue;
             if (f == null) f = new Focus();
             boolean isBlock = w.has("itemKey");
             if (f.label.isEmpty() || (isBlock && !fromBlock)) {

@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
+import { BodyCard } from '../components/BodyLog';
 import { artUrl, cssVars, Icon, Segmented, Sheet, Switch, TimeInput } from '../components/ui';
+import type { DayMode } from '../model/types';
 import { addDays, dateKey, fmt, fmtDateLong, fmtDuration, minutesOfDay } from '../lib/time';
 import {
   addExtra,
@@ -19,6 +21,12 @@ import { dayStats, pct } from '../model/stats';
 import type { BlockType, DayDoc, EffectiveStatus, ResolvedItem } from '../model/types';
 import { updateDay, updateTemplate, useAppState } from '../store/store';
 
+const MODE_HINT: Record<DayMode, string> = {
+  normal: 'Plan olduğu gibi.',
+  minimal: 'Sadece temel bloklar kalır: pelvis, 1 saat algo (sadece tekrarlar), 1 saat build, yemekler, şekerleme, 30 dk yürüyüş. Hiç yapmamaktan iyidir.',
+  off: 'Hiç bildirim yok, odak kilidi yok, takipte sayılmaz. Seriyi de bozmaz.',
+};
+
 export const STATUS_LABEL: Record<EffectiveStatus, string> = {
   upcoming: '',
   late: 'Bekliyor',
@@ -37,8 +45,9 @@ export function TodayScreen({ now }: { now: number }) {
   const items = useMemo(() => resolveDay(date, s.template, s.types, day), [date, s.template, s.types, day]);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const st = dayStats(date, items, now);
-  const minimal = day?.mode === 'minimal';
+  const mode: DayMode = day?.mode ?? 'normal';
+  const off = mode === 'off';
+  const st = dayStats(date, items, now, off);
   const editItem = items.find((i) => i.id === editing);
 
   return (
@@ -55,23 +64,35 @@ export function TodayScreen({ now }: { now: number }) {
         />
       </div>
       <p className="sub">
-        {fmtDateLong(date)} · {st.done}/{st.planned} blok · %{pct(st.done, st.planned)}
+        {fmtDateLong(date)} · {off ? 'off gün' : `${st.done}/${st.planned} blok · %${pct(st.done, st.planned)}`}
       </p>
 
       <div className="card">
-        <Switch
-          label="Kötü gün modu"
-          hint="Sadece temel bloklar kalır: pelvis, sabah yürüyüşü, 1 saat DSA. Hiç yapmamaktan iyidir."
-          checked={minimal}
-          onChange={(v) => updateDay(date, (d) => ({ ...d, mode: v ? 'minimal' : 'normal' }))}
+        <Segmented
+          options={[
+            { value: 'normal', label: 'Normal' },
+            { value: 'minimal', label: 'Kötü gün' },
+            { value: 'off', label: 'Off' },
+          ]}
+          value={mode}
+          onChange={(m: DayMode) => updateDay(date, (d) => ({ ...d, mode: m }))}
         />
+        <p className="muted" style={{ margin: 0 }}>{MODE_HINT[mode]}</p>
       </div>
 
-      <Timeline items={items} date={date} now={now} onPick={setEditing} />
+      {which === 'today' && <BodyCard date={date} />}
 
-      <button className="btn btn-ghost" onClick={() => setAdding(true)}>
-        <Icon name="plus" /> Bu güne blok ekle
-      </button>
+      {off ? (
+        <p className="muted">Bu gün plan dinleniyor. Normal'e alırsan bloklar ve bildirimler geri gelir.</p>
+      ) : (
+        <>
+          <Timeline items={items} date={date} now={now} onPick={setEditing} />
+
+          <button className="btn btn-ghost" onClick={() => setAdding(true)}>
+            <Icon name="plus" /> Bu güne blok ekle
+          </button>
+        </>
+      )}
 
       {editItem && <ItemSheet item={editItem} items={items} date={date} onClose={() => setEditing(null)} />}
       {adding && (
@@ -136,7 +157,11 @@ export function Timeline({
                   {it.extra ? ' · sadece bu gün' : ''}
                 </span>
               </span>
-              {STATUS_LABEL[st] && (it.type.tracked || st === 'active') ? <span className={`status st-${st}`}>{STATUS_LABEL[st]}</span> : <span />}
+              {STATUS_LABEL[st] && (it.type.tracked || st === 'active') ? (
+                <span className={`status st-${st}`}>{st === 'active' && it.log.pausedAt !== undefined ? 'Ara' : STATUS_LABEL[st]}</span>
+              ) : (
+                <span />
+              )}
             </button>
           </div>
         );
@@ -170,7 +195,14 @@ function ItemSheet({ item, items, date, onClose }: { item: ResolvedItem; items: 
 
   const saveToTemplate = () => {
     if (!tpl) return;
-    updateTemplate((list) => list.map((t) => (t.id === item.id ? { ...t, start: item.start, duration: item.duration, dnd: item.dnd } : t)));
+    // Only what was changed for this day goes into the template; on a bad
+    // (minimal) day the shorter duration is not a real change.
+    const ov = s.days[date]?.overrides[item.id] ?? {};
+    const patch: Partial<typeof tpl> = {};
+    if (ov.start !== undefined) patch.start = Math.min(ov.start, 24 * 60 - 5);
+    if (ov.duration !== undefined) patch.duration = ov.duration;
+    if (ov.dnd !== undefined) patch.dnd = ov.dnd;
+    updateTemplate((list) => list.map((t) => (t.id === item.id ? { ...t, ...patch } : t)));
     upd((d) => clearOverride(d, item.id));
   };
 
@@ -191,7 +223,7 @@ function ItemSheet({ item, items, date, onClose }: { item: ResolvedItem; items: 
         <span>Süre</span>
         <Stepper
           value={item.duration}
-          onChange={(v) => upd((d) => setDuration(d, item.id, Math.max(5, v)))}
+          onChange={(v) => upd((d) => setDuration(d, items, item.id, Math.max(5, v)))}
           render={<div className="input num" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{fmtDuration(item.duration)}</div>}
         />
       </div>

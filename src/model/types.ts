@@ -17,12 +17,13 @@ export type ArtKey =
 /**
  * How the "Şimdi" screen runs a block:
  * - timer: plain countdown
- * - pomodoro: 50 min focus / 10 min break cycles inside the block
+ * - pomodoro: focus / break cycles inside the block (focusMin / breakMin)
  * - tilt: guided pelvis routine (step by step, with timers)
  * - meditation: breathing circle + countdown
  * - walk: countdown + "turn back" cue at half time
+ * - workout: set log (kg × reps per set) with a rest timer between sets
  */
-export type BlockMode = 'timer' | 'pomodoro' | 'tilt' | 'meditation' | 'walk';
+export type BlockMode = 'timer' | 'pomodoro' | 'tilt' | 'meditation' | 'walk' | 'workout';
 
 /** A kind of activity. Its behaviour (notifications, image, focus lock) is fixed;
  *  only *when* it happens lives in the plan. */
@@ -43,6 +44,9 @@ export interface BlockType {
   focusAudio: boolean;
   /** Extra Android packages allowed while this block locks the phone. */
   allowedApps: string[];
+  /** Pomodoro lengths (mode 'pomodoro'); default 50 / 10. */
+  focusMin?: number;
+  breakMin?: number;
   /** "Sıradaki" – what to pick up next time; shown on the Şimdi screen. */
   note: string;
   tips?: string[];
@@ -76,15 +80,66 @@ export interface ItemLog {
   status: ItemStatus;
   startedAt?: number;
   endedAt?: number;
+  /** Paused since (an interruption): the timer stops, focus mode lets go. */
+  pausedAt?: number;
+  /** Earlier pauses in total. Each one made the block that much longer, so
+   *  real work time = time spent − pausedMs. */
+  pausedMs?: number;
 }
+
+/**
+ * - normal: the plan as is
+ * - minimal: "kötü gün", only the essential blocks
+ * - off: a day off — no notifications, no focus lock, not counted in stats
+ */
+export type DayMode = 'normal' | 'minimal' | 'off';
 
 /** One calendar day: only the differences from the weekly template. */
 export interface DayDoc {
   date: DateKey;
-  mode: 'normal' | 'minimal';
+  mode: DayMode;
   overrides: Record<string, ItemOverride>;
   extras: TemplateItem[];
   logs: Record<string, ItemLog>;
+  /** Frozen copy of the weekly template for a past day (see freezePastDays). */
+  tpl?: TemplateItem[];
+  /** The day's weight training, set by set (see workout.ts). */
+  workout?: WorkoutLog;
+  /** Body weight (weigh-in day), protein and water. */
+  body?: BodyLog;
+}
+
+/** One set. Empty kg/reps on a done set means "same as suggested". */
+export interface SetLog {
+  kg?: number;
+  reps?: number;
+  done?: boolean;
+}
+
+export interface ExerciseLog {
+  name: string;
+  /** Target reps from the program, e.g. "6-8", "8/taraf", "30-60 sn". */
+  reps: string;
+  restSec: number;
+  sets: SetLog[];
+}
+
+export interface WorkoutLog {
+  /** "Upper A" … */
+  name: string;
+  exercises: ExerciseLog[];
+}
+
+export interface BodyLog {
+  kg?: number;
+  protein?: number;
+  water?: number;
+}
+
+/** Remembered per exercise name: rest length and the program's set count. */
+export interface ExercisePref {
+  restSec?: number;
+  sets?: number;
 }
 
 export interface DndRange {
@@ -138,6 +193,11 @@ export interface Settings {
   /** Blocks with focus mode also lock apps (not only silence). */
   lockAppsInDndBlocks: boolean;
   showStreak: boolean;
+  /** Sunday evening summary of the week (moves to Monday morning if Sunday is off). */
+  weeklySummary: boolean;
+  weeklySummaryAt: Minutes;
+  /** Per exercise (by name): rest and set count changed in the workout log. */
+  exercisePrefs: Record<string, ExercisePref>;
   tiltStartDate: DateKey;
   audio: AudioSettings;
   supabaseUrl?: string;
@@ -157,6 +217,8 @@ export interface ResolvedItem {
   extra: boolean;
   /** true when this day has a time/duration change compared to the template */
   moved: boolean;
+  /** Date-aware details from the study roadmap (exercises, phase topics). */
+  detail?: string[];
 }
 
 export type EffectiveStatus = 'upcoming' | 'late' | 'active' | 'done' | 'skipped' | 'missed';

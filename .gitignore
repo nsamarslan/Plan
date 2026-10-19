@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/
 .env
 .env.local
@@ -15,3 +15,9 @@ android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
 android/app/src/main/res/xml/config.xml
+
+# Compiler output must never sit next to the sources
+src/**/*.js
+*.tsbuildinfo
+/vite.config.js
+/capacitor.config.js

@@ -15,7 +15,9 @@ final class Store {
     private static final String PREFS = "plan_native";
     private static final String EVENTS = "events";
     private static final String WINDOWS = "windows";
+    private static final String SLOTS = "slots";
     private static final String ACKED = "acked";
+    private static final String CLOSED = "closed";
     private static final String ACTIONS = "actions";
     private static final String SUPPRESS_UNTIL = "suppress_until";
     private static final String ZEN_RULE = "zen_rule_id";
@@ -39,6 +41,15 @@ final class Store {
         prefs(c).edit().putString(EVENTS, events.toString()).putString(WINDOWS, windows.toString()).apply();
     }
 
+    /** Where each block sits (see Shifter). */
+    static JSONArray slots(Context c) {
+        return array(prefs(c).getString(SLOTS, "[]"));
+    }
+
+    static void setSlots(Context c, JSONArray slots) {
+        prefs(c).edit().putString(SLOTS, slots.toString()).apply();
+    }
+
     private static JSONArray array(String s) {
         try {
             return new JSONArray(s);
@@ -53,23 +64,56 @@ final class Store {
     }
 
     static void ack(Context c, String itemKey) {
-        Set<String> s = new HashSet<>(prefs(c).getStringSet(ACKED, new HashSet<>()));
+        addTo(c, ACKED, itemKey);
+    }
+
+    /** Skipped / finished from a notification: nothing more for this block. */
+    static boolean isClosed(Context c, String itemKey) {
+        return prefs(c).getStringSet(CLOSED, new HashSet<>()).contains(itemKey);
+    }
+
+    static void close(Context c, String itemKey) {
+        addTo(c, CLOSED, itemKey);
+    }
+
+    /**
+     * The app sent a fresh plan in which these blocks are still waiting to start
+     * (it has seen every button tap by then), so earlier taps no longer apply —
+     * e.g. after "Durumu sıfırla" or moving the block.
+     */
+    static void reopen(Context c, Set<String> pendingKeys, Set<String> aliveKeys) {
+        SharedPreferences p = prefs(c);
+        Set<String> acked = new HashSet<>(p.getStringSet(ACKED, new HashSet<>()));
+        Set<String> closed = new HashSet<>(p.getStringSet(CLOSED, new HashSet<>()));
+        if (acked.removeAll(pendingKeys) | closed.removeAll(aliveKeys)) {
+            p.edit().putStringSet(ACKED, acked).putStringSet(CLOSED, closed).apply();
+        }
+    }
+
+    private static void addTo(Context c, String name, String itemKey) {
+        Set<String> s = new HashSet<>(prefs(c).getStringSet(name, new HashSet<>()));
         s.add(itemKey);
         // Keep the set small: drop keys from past days (keys start with YYYY-MM-DD).
-        String today = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(new java.util.Date());
+        String yesterday = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            .format(new java.util.Date(System.currentTimeMillis() - 86_400_000L));
         Set<String> keep = new HashSet<>();
-        for (String k : s) if (k.compareTo(today) >= 0) keep.add(k);
-        prefs(c).edit().putStringSet(ACKED, keep).apply();
+        for (String k : s) if (k.compareTo(yesterday) >= 0) keep.add(k);
+        prefs(c).edit().putStringSet(name, keep).apply();
     }
 
     /** Actions taken from notification buttons, consumed by the web app on resume. */
-    static synchronized void pushAction(Context c, String type, String itemKey) {
+    static void pushAction(Context c, String type, String itemKey) {
+        pushAction(c, type, itemKey, System.currentTimeMillis());
+    }
+
+    /** `at` is the tap time; "+10 dk" counts from it, here and in the app. */
+    static synchronized void pushAction(Context c, String type, String itemKey, long at) {
         JSONArray a = array(prefs(c).getString(ACTIONS, "[]"));
         try {
             JSONObject o = new JSONObject();
             o.put("type", type);
             if (itemKey != null) o.put("itemKey", itemKey);
-            o.put("at", System.currentTimeMillis());
+            o.put("at", at);
             a.put(o);
         } catch (JSONException ignored) {
         }

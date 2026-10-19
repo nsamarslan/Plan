@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { addAudio, deleteAudio, listAudio, type AudioKind, type AudioMeta } from '../audio/db';
-import { focusAudio, previewCue } from '../audio/engine';
-import { Icon, Segmented, Switch } from '../components/ui';
+import { setAudioTest, useAudioTest } from '../audio/controller';
+import { previewCue } from '../audio/engine';
+import { Icon, NumberInput, Segmented, Switch } from '../components/ui';
 import { uid } from '../model/schedule';
 import type { AudioSettings } from '../model/types';
 import { isNative, PlanNative, type VoiceInfo } from '../native/plan';
@@ -39,7 +40,9 @@ export function AudioSettingsCard() {
   const set = (patch: Partial<AudioSettings>) => updateSettings((x) => ({ ...x, audio: { ...x.audio, ...patch } }));
   const [files, setFiles] = useState<AudioMeta[]>([]);
   const [newPhrase, setNewPhrase] = useState('');
-  const [testing, setTesting] = useState(false);
+  const testing = useAudioTest();
+  // Leaving Ayarlar ends the test.
+  useEffect(() => () => setAudioTest(false), []);
   const voices = useVoices(a.lang);
   const refresh = () => void listAudio().then(setFiles);
   useEffect(refresh, []);
@@ -89,25 +92,11 @@ export function AudioSettingsCard() {
       <div className="grid2">
         <label className="field">
           <span>En az aralık (dk)</span>
-          <input
-            className="input num"
-            type="number"
-            min={0.5}
-            step={0.5}
-            value={a.minSec / 60}
-            onChange={(e) => set({ minSec: Math.max(10, Number(e.target.value) * 60 || 60) })}
-          />
+          <NumberInput decimals min={0.25} max={240} step={0.5} value={a.minSec / 60} onChange={(v) => v !== undefined && set({ minSec: Math.round(v * 60) })} />
         </label>
         <label className="field">
           <span>En çok aralık (dk)</span>
-          <input
-            className="input num"
-            type="number"
-            min={0.5}
-            step={0.5}
-            value={a.maxSec / 60}
-            onChange={(e) => set({ maxSec: Math.max(10, Number(e.target.value) * 60 || 60) })}
-          />
+          <NumberInput decimals min={0.25} max={240} step={0.5} value={a.maxSec / 60} onChange={(v) => v !== undefined && set({ maxSec: Math.round(v * 60) })} />
         </label>
       </div>
 
@@ -159,11 +148,7 @@ export function AudioSettingsCard() {
         </button>
         <button
           className="btn btn-sm"
-          onClick={() => {
-            if (testing) focusAudio.stop();
-            else focusAudio.start(a, 'DSA');
-            setTesting(!testing);
-          }}
+          onClick={() => setAudioTest(!testing)}
         >
           <Icon name={testing ? 'stop' : 'play'} size={16} /> {testing ? 'Testi durdur' : 'Hepsini test et'}
         </button>

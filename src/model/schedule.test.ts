@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { msAt, MIN_MS } from '../lib/time';
-import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './defaults';
+import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './legacy.fixture';
 import {
   emptyDay,
   finishItem,

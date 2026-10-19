@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { parseHM } from '../lib/time';
 import type { ArtKey } from '../model/types';
 import { dismiss, useToasts } from '../services/toast';
 
@@ -41,7 +42,14 @@ const paths: Record<string, ReactNode> = {
   expand: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
   trash: <path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" />,
   play: <path d="M7 5v14l12-7L7 5Z" />,
+  pause: <path d="M8.5 5.5v13M15.5 5.5v13" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
+  timer: (
+    <>
+      <circle cx="12" cy="13.5" r="7.5" />
+      <path d="M12 9.5v4l2.5 2M9.5 2.5h5M12 2.5v3.5" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof paths;
@@ -186,18 +194,20 @@ export function Segmented<T extends string>({
   );
 }
 
-/** Button that only fires after being held for `ms` (for "escape" actions). */
+/** Button that only fires after being held for `ms` (for "escape" actions). Touch, mouse or Space/Enter. */
 export function HoldButton({ ms = 5000, onDone, children }: { ms?: number; onDone: () => void; children: ReactNode }) {
   const [p, setP] = useState(0);
   const timer = useRef<number | undefined>(undefined);
   const startAt = useRef(0);
   const stop = () => {
-    cancelAnimationFrame(timer.current!);
+    if (timer.current !== undefined) cancelAnimationFrame(timer.current);
+    timer.current = undefined;
     setP(0);
   };
   const tick = () => {
     const v = (Date.now() - startAt.current) / ms;
     if (v >= 1) {
+      timer.current = undefined;
       setP(0);
       onDone();
       return;
@@ -205,17 +215,31 @@ export function HoldButton({ ms = 5000, onDone, children }: { ms?: number; onDon
     setP(v);
     timer.current = requestAnimationFrame(tick);
   };
+  const start = () => {
+    if (timer.current !== undefined) return;
+    startAt.current = Date.now();
+    timer.current = requestAnimationFrame(tick);
+  };
+  useEffect(() => () => {
+    if (timer.current !== undefined) cancelAnimationFrame(timer.current);
+  }, []);
   return (
     <button
+      type="button"
       className="btn btn-danger hold"
       style={cssVars({ '--p': p })}
-      onPointerDown={() => {
-        startAt.current = Date.now();
-        timer.current = requestAnimationFrame(tick);
-      }}
+      onPointerDown={start}
       onPointerUp={stop}
       onPointerLeave={stop}
       onPointerCancel={stop}
+      onKeyDown={(e) => {
+        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+          e.preventDefault();
+          start();
+        }
+      }}
+      onKeyUp={(e) => (e.key === ' ' || e.key === 'Enter') && stop()}
+      onBlur={stop}
     >
       <span>{children}</span>
     </button>
@@ -236,6 +260,59 @@ export function Toasts() {
   );
 }
 
+/** Number field that can be typed freely; the value is checked and saved on blur / Enter. */
+export function NumberInput({
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  allowEmpty,
+  decimals,
+  placeholder,
+  label,
+}: {
+  value: number | undefined;
+  onChange: (v: number | undefined) => void;
+  min: number;
+  max?: number;
+  step?: number;
+  allowEmpty?: boolean;
+  decimals?: boolean;
+  placeholder?: string;
+  label?: string;
+}) {
+  const [text, setText] = useState(value === undefined ? '' : String(value));
+  useEffect(() => setText(value === undefined ? '' : String(value)), [value]);
+  const commit = () => {
+    const t = text.trim();
+    if (t === '' && allowEmpty) return onChange(undefined);
+    const raw = Number(t.replace(',', '.'));
+    const n = decimals ? raw : Math.round(raw);
+    if (!Number.isFinite(n) || n < min || (max !== undefined && n > max)) {
+      setText(value === undefined ? '' : String(value));
+      return;
+    }
+    if (n !== value) onChange(n);
+  };
+  return (
+    <input
+      className="input num"
+      inputMode={decimals ? 'decimal' : 'numeric'}
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      placeholder={placeholder}
+      aria-label={label}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
+    />
+  );
+}
+
 export function TimeInput({ value, onChange }: { value: number; onChange: (min: number) => void }) {
   const h = String(Math.floor(value / 60) % 24).padStart(2, '0');
   const m = String(Math.round(value % 60)).padStart(2, '0');
@@ -245,8 +322,9 @@ export function TimeInput({ value, onChange }: { value: number; onChange: (min: 
       type="time"
       value={`${h}:${m}`}
       onChange={(e) => {
-        const [hh, mm] = e.target.value.split(':').map(Number);
-        if (!Number.isNaN(hh) && !Number.isNaN(mm)) onChange(hh * 60 + mm);
+        // A cleared field gives ""; ignore it and React shows the old value again.
+        const v = parseHM(e.target.value);
+        if (v !== null) onChange(v);
       }}
     />
   );

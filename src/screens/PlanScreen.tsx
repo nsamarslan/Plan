@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { artUrl, Chips, cssVars, Icon, Sheet, Switch, TimeInput } from '../components/ui';
+import { artUrl, Chips, cssVars, Icon, NumberInput, Sheet, Switch, TimeInput } from '../components/ui';
 import { AppPicker } from '../components/AppPicker';
 import { addDays, ALL_DAYS, dateKey, fmtDuration, WEEK_ORDER, WEEKDAYS_LONG, WEEKDAYS_SHORT, weekday } from '../lib/time';
-import { resolveDay, uid } from '../model/schedule';
+import { POMO_PRESETS } from '../model/quick';
+import { pomodoroLengths, pomodoroPhases, resolveDay, uid } from '../model/schedule';
 import type { ArtKey, BlockMode, BlockType, TemplateItem } from '../model/types';
 import { isNative } from '../native/plan';
 import { addType, updateSettings, updateTemplate, updateType, useAppState } from '../store/store';
@@ -154,14 +155,7 @@ function TemplateItemSheet({ item, onClose }: { item: TemplateItem; onClose: () 
         </label>
         <label className="field">
           <span>Süre (dk)</span>
-          <input
-            className="input num"
-            type="number"
-            min={5}
-            step={5}
-            value={item.duration}
-            onChange={(e) => upd({ duration: Math.max(5, Number(e.target.value) || 5) })}
-          />
+          <NumberInput min={5} max={24 * 60} step={5} value={item.duration} onChange={(v) => v !== undefined && upd({ duration: v })} />
         </label>
       </div>
       <div className="field">
@@ -182,14 +176,7 @@ function TemplateItemSheet({ item, onClose }: { item: TemplateItem; onClose: () 
       {item.minimal && (
         <label className="field">
           <span>Kötü gün süresi (dk, boş: aynı)</span>
-          <input
-            className="input num"
-            type="number"
-            min={5}
-            step={5}
-            value={item.minimalDuration ?? ''}
-            onChange={(e) => upd({ minimalDuration: Number(e.target.value) || undefined })}
-          />
+          <NumberInput min={5} max={24 * 60} step={5} allowEmpty value={item.minimalDuration} onChange={(v) => upd({ minimalDuration: v })} />
         </label>
       )}
       <button
@@ -208,11 +195,54 @@ function TemplateItemSheet({ item, onClose }: { item: TemplateItem; onClose: () 
 const ARTS: ArtKey[] = ['tilt', 'walk', 'weights', 'reading', 'meditation', 'dsa', 'design', 'ai', 'review', 'meal', 'free', 'sleep'];
 const MODES: { value: BlockMode; label: string }[] = [
   { value: 'timer', label: 'Sayaç' },
-  { value: 'pomodoro', label: 'Pomodoro (50/10)' },
+  { value: 'pomodoro', label: 'Pomodoro (odak / mola)' },
   { value: 'walk', label: 'Yürüyüş (yarıda dönüş)' },
   { value: 'meditation', label: 'Meditasyon (nefes)' },
   { value: 'tilt', label: 'Pelvis rehberi' },
 ];
+
+function PomodoroEditor({ type, onChange }: { type: BlockType; onChange: (patch: Partial<BlockType>) => void }) {
+  const s = useAppState();
+  const { focus, brk } = pomodoroLengths(type);
+  // How this splits the blocks of this type that are in the plan.
+  const durations = [...new Set(s.template.filter((t) => t.typeId === type.id).map((t) => t.duration))].sort((a, b) => b - a);
+  return (
+    <div className="field">
+      <span>Pomodoro</span>
+      <div className="chips">
+        {POMO_PRESETS.map((p) => (
+          <button
+            key={`${p.focus}/${p.brk}`}
+            type="button"
+            className="chip"
+            aria-pressed={p.focus === focus && p.brk === brk}
+            onClick={() => onChange({ focusMin: p.focus, breakMin: p.brk })}
+          >
+            {p.focus} / {p.brk}
+          </button>
+        ))}
+      </div>
+      <div className="grid2">
+        <label className="field">
+          <span>Odak (dk)</span>
+          <NumberInput min={5} max={240} step={5} value={focus} onChange={(v) => v !== undefined && onChange({ focusMin: v })} />
+        </label>
+        <label className="field">
+          <span>Mola (dk, 0 = yok)</span>
+          <NumberInput min={0} max={120} step={5} value={brk} onChange={(v) => v !== undefined && onChange({ breakMin: v })} />
+        </label>
+      </div>
+      {durations.map((d) => (
+        <p key={d} className="muted">
+          {fmtDuration(d)}:{' '}
+          {pomodoroPhases(d, focus, brk)
+            .map((p) => `${p.end - p.start} ${p.kind === 'focus' ? 'odak' : 'mola'}`)
+            .join(' · ')}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 function TypeSheet({ type, onClose }: { type: BlockType; onClose: () => void }) {
   const upd = (patch: Partial<BlockType>) => updateType(type.id, (t) => ({ ...t, ...patch }));
@@ -246,6 +276,7 @@ function TypeSheet({ type, onClose }: { type: BlockType; onClose: () => void }) 
           </select>
         </label>
       </div>
+      {type.mode === 'pomodoro' && <PomodoroEditor type={type} onChange={upd} />}
       <div className="field">
         <span>Resim</span>
         <div className="type-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))' }}>

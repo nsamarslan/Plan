@@ -7,8 +7,16 @@ import { focusAudio } from './engine';
 // block changes.
 
 let mutedFor: string | null = null;
+/** "Hepsini test et" in Ayarlar: play now, whatever block is running. */
+let testing = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+const sub = (l: () => void) => {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+};
 
 export function setAudioMuted(key: string | null) {
   mutedFor = key;
@@ -16,13 +24,16 @@ export function setAudioMuted(key: string | null) {
 }
 
 export function useAudioMuted(): string | null {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    () => mutedFor,
-  );
+  return useSyncExternalStore(sub, () => mutedFor);
+}
+
+export function setAudioTest(on: boolean) {
+  testing = on;
+  emit();
+}
+
+export function useAudioTest(): boolean {
+  return useSyncExternalStore(sub, () => testing);
 }
 
 export function audioWanted(settings: Settings, current: ResolvedItem | undefined, status: EffectiveStatus | undefined): boolean {
@@ -38,11 +49,20 @@ export function useFocusAudioController(
   current: ResolvedItem | undefined,
   status: EffectiveStatus | undefined,
   dateKey: string,
+  /** Pomodoro break: step away, so music and cues pause until the next focus. */
+  inBreak = false,
+  /** A standalone pomodoro counts as a focus block. */
+  quick?: { key: string; label: string; inBreak: boolean },
 ) {
   const muted = useAudioMuted();
-  const key = current ? `${dateKey}|${current.id}` : 'free';
-  const wanted = audioWanted(settings, current, status) && muted !== key;
-  const label = current?.label ?? '';
+  const test = useAudioTest();
+  const a = settings.audio;
+  const hasSomething = a.voiceEnabled || (a.musicEnabled && a.musicIds.length > 0);
+  const key = quick ? quick.key : current ? `${dateKey}|${current.id}` : 'free';
+  const planWanted = quick ? hasSomething : audioWanted(settings, current, status);
+  const breakNow = quick ? quick.inBreak : inBreak;
+  const wanted = (planWanted && muted !== key && !breakNow) || test;
+  const label = quick ? quick.label : current?.label ?? (test ? 'DSA' : '');
 
   useEffect(() => {
     if (wanted) focusAudio.start(settings.audio, label);
@@ -51,5 +71,5 @@ export function useFocusAudioController(
 
   useEffect(() => () => focusAudio.stop(), []);
 
-  return { wanted: audioWanted(settings, current, status), muted: muted === key, key };
+  return { wanted: planWanted, muted: muted === key, key };
 }

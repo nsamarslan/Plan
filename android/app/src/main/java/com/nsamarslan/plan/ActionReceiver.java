@@ -9,7 +9,7 @@ import androidx.core.app.NotificationManagerCompat;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** "Başladım" / "Atla" / "Tamamladım" buttons on notifications. */
+/** "Başladım" / "+10 dk" / "Atla" / "Tamamladım" buttons on notifications. */
 public class ActionReceiver extends BroadcastReceiver {
     static final String ACTION = "com.nsamarslan.plan.ACTION";
     static final String EXTRA_TYPE = "type";
@@ -20,22 +20,39 @@ public class ActionReceiver extends BroadcastReceiver {
         String type = intent.getStringExtra(EXTRA_TYPE);
         String key = intent.getStringExtra(EXTRA_ITEM);
         if (type == null || key == null) return;
-        Store.pushAction(c, type, key);
-        Store.ack(c, key);
-        NotificationManagerCompat.from(c).cancel(Notifier.idFor(key, "start"));
-        NotificationManagerCompat.from(c).cancel(Notifier.idFor(key, "end"));
-        if (!"start".equals(type)) dropWindows(c, key);
+        long now = System.currentTimeMillis();
+        Store.pushAction(c, type, key, now);
+        NotificationManagerCompat nm = NotificationManagerCompat.from(c);
+        nm.cancel(Notifier.idFor(key, "start"));
+        nm.cancel(Notifier.idFor(key, "end"));
+        nm.cancel(Notifier.idFor(key, "cue"));
+        if ("snooze".equals(type)) {
+            // Not acked: its "Şimdi" notification comes again 10 minutes later.
+            Shifter.snooze(c, key, now);
+        } else if ("extend".equals(type)) {
+            Store.ack(c, key);
+            Shifter.extend(c, key, now);
+        } else {
+            Store.ack(c, key);
+            if (!"start".equals(type)) {
+                Store.close(c, key);
+                dropItem(c, key);
+            }
+        }
         Scheduler.run(c);
     }
 
-    /** A skipped or finished block should not keep the phone locked. */
-    private static void dropWindows(Context c, String key) {
-        JSONArray in = Store.windows(c);
+    /** A skipped or finished block: no more cues, end notice or focus lock for it. */
+    private static void dropItem(Context c, String key) {
+        Store.setSchedule(c, without(Store.events(c), key), without(Store.windows(c), key));
+    }
+
+    private static JSONArray without(JSONArray in, String key) {
         JSONArray out = new JSONArray();
         for (int i = 0; i < in.length(); i++) {
-            JSONObject w = in.optJSONObject(i);
-            if (w != null && !key.equals(w.optString("itemKey"))) out.put(w);
+            JSONObject o = in.optJSONObject(i);
+            if (o != null && !key.equals(o.optString("itemKey"))) out.put(o);
         }
-        Store.setSchedule(c, Store.events(c), out);
+        return out;
     }
 }
