@@ -177,6 +177,8 @@ export interface ResolvedItem {
   extra: boolean;
   /** true when this day has a time/duration change compared to the template */
   moved: boolean;
+  /** Date-aware details from the study roadmap (exercises, phase topics). */
+  detail?: string[];
 }
 
 export type EffectiveStatus = 'upcoming' | 'late' | 'active' | 'done' | 'skipped' | 'missed';

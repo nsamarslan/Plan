@@ -15,26 +15,30 @@ DEHB dostu günlük plan uygulaması. Açtığında sadece **şu an ne yapman ge
 
 ## Varsayılan gün
 
-Kalkış 07:00, yatış 22:30. Plan → Şablon ekranından her şeyi değiştirebilirsin.
+Ekim 2026 çalışma planı (Obsidian'daki ana hub). Kalkış 06:30, yatış 23:00, 18:6 aralıklı oruç (yemek 13:00–19:00). Pazar dahil her gün aynı; dinlenmek istediğin gün Bugün → **Off**. Plan → Şablon ekranından her şeyi değiştirebilirsin.
 
 | Saat | Blok |
 |---|---|
-| 07:15 | Meditasyon (30 dk) |
-| 07:45 | Pelvis egzersizi (15 dk) |
-| 08:00 | Sabah yürüyüşü (45 dk) |
-| 08:45 | Kahvaltı |
-| 09:30 | DSA 1 (90 dk, 50/10 pomodoro) |
-| 11:15 | DSA 2 (90 dk) |
-| 12:45 | Öğle yemeği |
-| 13:30 | Okuma 1 (60 dk) |
-| 14:45 | System Design (60 dk) |
-| 16:00 | AI satış uygulaması (60 dk) |
-| 17:15 | Ağırlık (45 dk, Pzt-Sal-Per-Cum) |
-| 18:15 | Akşam yürüyüşü (45 dk) |
-| 19:00 | Akşam yemeği |
-| 20:30 | Okuma 2 (60 dk) |
-| 21:45 | Yarını planla (10 dk) |
-| 22:30–07:00 | Gece odak modu |
+| 06:35 | Pelvis programı (15 dk) |
+| 07:00 | Algo (120 dk, 50/10 pomodoro) |
+| 09:20 | Build (180 dk, 50/10) |
+| 12:20 | Meditasyon (40 dk) |
+| 13:00 | Öğle yemeği |
+| 13:30 | Şekerleme (25 dk) |
+| 14:00 | Teori (120 dk, 50/10) |
+| 16:00 | Ara öğün (Pzt-Sal-Per-Cum) |
+| 16:10 | Ağırlık (80 dk, Pzt-Sal-Per-Cum) |
+| 17:45 | Akşam yemeği |
+| 18:30 | Yürüyüş (60 dk) |
+| 20:30 | Okuma (60 dk) |
+| 22:00–06:30 | Gece odak modu (ekranlar kapalı) |
+
+**Tarihe göre değişen bloklar** (`src/model/roadmap.ts`, H1 = 19 Ekim 2026, 26 hafta):
+
+- **Algo / Build / Teori:** başlık ve "ilk adım" haftaya ve faza göre gelir. Örnekler: "Build · Modül 1-7", "AI · RAG + pgvector". Teori bloğu H1'de hep Python. Sonra Pzt/Çar/Cum System Design, Sal/Per/Paz Python; Faz 3'ten itibaren her gün SD. Cumartesi: Algo mock, haftayı kapatan commit, SD mock ya da haftalık tekrar.
+- **Ağırlık:** Pzt Upper A, Sal Lower A, Per Upper B, Cum Lower B; hareket listesi ekranda. 1 Kasım'a kadar her harekette 1 set eksik.
+- Şimdi ekranında bloğun altında o haftanın faz bilgisi ve konuları görünür.
+- **Kötü gün:** pelvis, 60 dk algo (sadece tekrarlar), 60 dk build, yemekler, şekerleme, 30 dk yürüyüş.
 
 ## Telefona kurulum (Android)
 

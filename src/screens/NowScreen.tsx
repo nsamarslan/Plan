@@ -26,6 +26,7 @@ import {
   startItem,
   workMinutes,
 } from '../model/schedule';
+import { roadmapBadge } from '../model/roadmap';
 import { dayStats } from '../model/stats';
 import { programDay } from '../model/tilt';
 import type { ArtKey, EffectiveStatus, ResolvedItem } from '../model/types';
@@ -290,6 +291,7 @@ function Current({
   }
   const tips = type.tips ?? [];
   const tip = tips.length ? tips[Math.floor(now / (5 * MIN_MS)) % tips.length] : '';
+  const badge = roadmapBadge(today);
 
   return (
     <>
@@ -338,6 +340,18 @@ function Current({
         </p>
       )}
       {active && !paused && tip && <p className="now-step">{tip}</p>}
+      {/* Roadmap details (exercises, this phase's topics). A running pomodoro
+          already fills the screen with its timer, so they step aside then. */}
+      {!pomo && !!item.detail?.length && (
+        <div className="now-detail">
+          {badge && <b>{badge}</b>}
+          <ul>
+            {item.detail.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {type.note && (
         <button className="note-line" style={{ background: 'none', border: 0, padding: 0, textAlign: 'left' }} onClick={() => onEditNote(item.typeId)}>
           <Icon name="edit" size={16} />

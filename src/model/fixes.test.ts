@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { msAt } from '../lib/time';
-import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './defaults';
+import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './legacy.fixture';
 import { activeFocus, buildEvents, buildFocusWindows } from './notify';
 import { emptyDay, nowStateAround, postponeItem, resolveDay, setDuration, startItem } from './schedule';
 import type { DayDoc, TemplateItem } from './types';

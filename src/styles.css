@@ -335,6 +335,16 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 .now-next i { width: 10px; height: 10px; border-radius: 50%; background: var(--nc); flex: none; }
 .go { background: var(--c); color: #0b0f14; }
 .late { color: var(--warn); font-weight: 700; }
+.now-detail {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+.now-detail b { display: block; font-size: 0.72rem; letter-spacing: 0.12em; color: var(--c); margin-bottom: 4px; }
+.now-detail ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
 .note-line { display: flex; gap: 8px; align-items: center; font-size: 0.95rem; color: var(--ink-2); }
 .note-line b { color: var(--ink); }
 
