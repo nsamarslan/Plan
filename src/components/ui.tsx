@@ -269,6 +269,8 @@ export function NumberInput({
   step,
   allowEmpty,
   decimals,
+  placeholder,
+  label,
 }: {
   value: number | undefined;
   onChange: (v: number | undefined) => void;
@@ -277,6 +279,8 @@ export function NumberInput({
   step?: number;
   allowEmpty?: boolean;
   decimals?: boolean;
+  placeholder?: string;
+  label?: string;
 }) {
   const [text, setText] = useState(value === undefined ? '' : String(value));
   useEffect(() => setText(value === undefined ? '' : String(value)), [value]);
@@ -299,6 +303,8 @@ export function NumberInput({
       min={min}
       max={max}
       step={step}
+      placeholder={placeholder}
+      aria-label={label}
       value={text}
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}

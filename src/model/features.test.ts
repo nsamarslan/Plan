@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, fmt, msAt, MIN_MS } from '../lib/time';
-import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './defaults';
+import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './legacy.fixture';
 import { buildEvents, buildFocusWindows, weeklySummaryEvent, type PlanInput } from './notify';
 import { quickEvents, quickState, quickWindows, type QuickSession } from './quick';
 import {

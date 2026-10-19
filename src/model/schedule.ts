@@ -8,6 +8,7 @@ import type {
   ResolvedItem,
   TemplateItem,
 } from './types';
+import { blockPlan } from './roadmap';
 
 export function emptyDay(date: DateKey): DayDoc {
   return { date, mode: 'normal', overrides: {}, extras: [], logs: {} };
@@ -45,11 +46,15 @@ export function resolveDay(
     const duration = validDuration(ov.duration) ? ov.duration! : baseDuration;
     // Never let one broken record (e.g. a cleared time input) break the whole day.
     if (!validStart(start) || !validDuration(duration)) return;
+    // The roadmap names the block for this date (e.g. "Upper A", "System Design");
+    // a label typed into the template still wins.
+    const plan = blockPlan(t.typeId, date);
     out.push({
       id: t.id,
       typeId: t.typeId,
-      type,
-      label: t.label || type.name,
+      type: plan?.firstStep ? { ...type, firstStep: plan.firstStep } : type,
+      label: t.label || plan?.label || type.name,
+      ...(plan?.detail ? { detail: plan.detail } : {}),
       start,
       end: start + duration,
       duration,

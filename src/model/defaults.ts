@@ -56,7 +56,7 @@ export const DEFAULT_TYPES: BlockType[] = [
     color: '#f97316',
     art: 'weights',
     firstStep: 'Antrenman kıyafetini giy, suyu doldur, ilk hareketin ağırlığını hazırla.',
-    mode: 'timer',
+    mode: 'workout',
     tracked: true,
     dnd: false,
     notify: true,
@@ -95,10 +95,10 @@ export const DEFAULT_TYPES: BlockType[] = [
   },
   {
     id: 'dsa',
-    name: 'DSA',
+    name: 'Algo',
     color: '#3b82f6',
     art: 'dsa',
-    firstStep: 'Sıradaki soruyu aç, problemi kendi cümlenle bir satırda yaz.',
+    firstStep: "Obsidian'da Dashboard'u aç: önce 'Bugünün tekrarı', sonra 'Henüz denenmedi' listesinin ilk satırı.",
     mode: 'pomodoro',
     focusMin: 50,
     breakMin: 10,
@@ -110,27 +110,11 @@ export const DEFAULT_TYPES: BlockType[] = [
     note: '',
   },
   {
-    id: 'design',
-    name: 'System Design',
-    color: '#d946ef',
-    art: 'design',
-    firstStep: 'Bugünkü konunun başlığını yaz, 5 dakika gereksinimleri listele.',
-    mode: 'pomodoro',
-    focusMin: 50,
-    breakMin: 10,
-    tracked: true,
-    dnd: true,
-    notify: true,
-    focusAudio: true,
-    allowedApps: [],
-    note: '',
-  },
-  {
-    id: 'ai',
-    name: 'AI Satış Uygulaması',
+    id: 'build',
+    name: 'Build',
     color: '#10b981',
     art: 'ai',
-    firstStep: 'Dünkü notuna bak, tek bir küçük görev seç ve hemen başla.',
+    firstStep: "FastAPI ilerleme tablosunda ilk ⬜ modülü aç, dünkü commit'e bak, kodu kendin yazmaya başla.",
     mode: 'pomodoro',
     focusMin: 50,
     breakMin: 10,
@@ -138,6 +122,36 @@ export const DEFAULT_TYPES: BlockType[] = [
     dnd: true,
     notify: true,
     focusAudio: true,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'theory',
+    name: 'Teori',
+    color: '#d946ef',
+    art: 'design',
+    firstStep: 'Bugünkü notu aç, başlığı yaz, 5 dakika ne öğreneceğini listele.',
+    mode: 'pomodoro',
+    focusMin: 50,
+    breakMin: 10,
+    tracked: true,
+    dnd: true,
+    notify: true,
+    focusAudio: true,
+    allowedApps: [],
+    note: '',
+  },
+  {
+    id: 'nap',
+    name: 'Şekerleme',
+    color: '#6366f1',
+    art: 'sleep',
+    firstStep: "Telefonun alarmını 25 dakikaya kur, uzan, gözlerini kapat. Uyuyamasan da dinlen; 15:00'ten sonra şekerleme yok.",
+    mode: 'timer',
+    tracked: false,
+    dnd: true,
+    notify: true,
+    focusAudio: false,
     allowedApps: [],
     note: '',
   },
@@ -181,25 +195,31 @@ const item = (
   extra: Partial<TemplateItem> = {},
 ): TemplateItem => ({ id: tid(), typeId, start, duration, days: EVERY_DAY, ...extra });
 
-/** Default day: wake 07:00, sleep 22:30 (8.5 h). Weights Mon/Tue/Thu/Fri. */
+const TRAINING_DAYS = [1, 2, 4, 5];
+
+/**
+ * The October 2026 study day (Obsidian hub, "Günlük ritim"): wake 06:30,
+ * sleep 23:00, screens off 22:00. 18:6 fasting — eating 13:00–19:00, no
+ * breakfast. Every day the same, Sunday included; a rest day is "Off" mode.
+ * Algo, Build, Teori and the weights block take their title from the
+ * roadmap (roadmap.ts), so they carry no label here.
+ * Kötü gün = the hub's minimum mode: due reviews + 1 h build + the basics.
+ */
 export function defaultTemplate(): TemplateItem[] {
   seq = 0;
   return [
-    item('meditation', hm(7, 15), 30),
-    item('tilt', hm(7, 45), 15, { minimal: true }),
-    item('walk', hm(8, 0), 45, { label: 'Sabah Yürüyüşü', minimal: true }),
-    item('meal', hm(8, 45), 45, { label: 'Kahvaltı', minimal: true }),
-    item('dsa', hm(9, 30), 90, { label: 'DSA 1', minimal: true, minimalDuration: 60 }),
-    item('dsa', hm(11, 15), 90, { label: 'DSA 2' }),
-    item('meal', hm(12, 45), 45, { label: 'Öğle Yemeği', minimal: true }),
-    item('reading', hm(13, 30), 60, { label: 'Okuma 1' }),
-    item('design', hm(14, 45), 60),
-    item('ai', hm(16, 0), 60),
-    item('weights', hm(17, 15), 45, { days: [1, 2, 4, 5] }),
-    item('walk', hm(18, 15), 45, { label: 'Akşam Yürüyüşü' }),
-    item('meal', hm(19, 0), 60, { label: 'Akşam Yemeği', minimal: true }),
-    item('reading', hm(20, 30), 60, { label: 'Okuma 2' }),
-    item('review', hm(21, 45), 10, { minimal: true }),
+    item('tilt', hm(6, 35), 15, { minimal: true }),
+    item('dsa', hm(7, 0), 120, { minimal: true, minimalDuration: 60 }),
+    item('build', hm(9, 20), 180, { minimal: true, minimalDuration: 60 }),
+    item('meditation', hm(12, 20), 40),
+    item('meal', hm(13, 0), 30, { label: 'Öğle Yemeği', minimal: true }),
+    item('nap', hm(13, 30), 25, { minimal: true }),
+    item('theory', hm(14, 0), 120),
+    item('meal', hm(16, 0), 10, { label: 'Ara Öğün', days: TRAINING_DAYS }),
+    item('weights', hm(16, 10), 80, { days: TRAINING_DAYS }),
+    item('meal', hm(17, 45), 40, { label: 'Akşam Yemeği', minimal: true }),
+    item('walk', hm(18, 30), 60, { minimal: true, minimalDuration: 30 }),
+    item('reading', hm(20, 30), 60),
   ];
 }
 
@@ -247,17 +267,18 @@ export function defaultAudio(): AudioSettings {
 
 export function defaultSettings(): Settings {
   return {
-    wake: hm(7),
-    sleep: hm(22, 30),
+    wake: hm(6, 30),
+    sleep: hm(23),
     preWarnMin: 5,
     remindEveryMin: 3,
     remindCount: 3,
     dndRanges: [
       {
+        // Screens off at 22:00 (monk mode), up at 06:30.
         id: 'night',
         label: 'Gece',
-        start: hm(22, 30),
-        end: hm(7),
+        start: hm(22),
+        end: hm(6, 30),
         days: EVERY_DAY,
         silence: true,
         lockApps: true,
@@ -269,6 +290,7 @@ export function defaultSettings(): Settings {
     showStreak: false,
     weeklySummary: true,
     weeklySummaryAt: hm(20),
+    exercisePrefs: {},
     tiltStartDate: dateKey(new Date()),
     audio: defaultAudio(),
   };

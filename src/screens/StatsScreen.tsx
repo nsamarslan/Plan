@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { BodyHistory } from '../components/BodyLog';
 import { cssVars, Segmented } from '../components/ui';
 import { addDays, dateKey, daysBetween, fmtDateLong, fmtDuration, weekday, WEEKDAYS_SHORT } from '../lib/time';
 import { effectiveStatus, resolveDay } from '../model/schedule';
@@ -101,6 +102,8 @@ export function StatsScreen({ now }: { now: number }) {
         )}
         {s.settings.weeklySummary && <p className="muted" style={{ margin: 0 }}>Pazar akşamı bu özet bildirim olarak da gelir.</p>}
       </div>
+
+      <BodyHistory today={today} />
 
       <div className="card">
         <div className="card-h">

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { BodyCard } from '../components/BodyLog';
 import { artUrl, cssVars, Icon, Segmented, Sheet, Switch, TimeInput } from '../components/ui';
 import type { DayMode } from '../model/types';
 import { addDays, dateKey, fmt, fmtDateLong, fmtDuration, minutesOfDay } from '../lib/time';
@@ -22,7 +23,7 @@ import { updateDay, updateTemplate, useAppState } from '../store/store';
 
 const MODE_HINT: Record<DayMode, string> = {
   normal: 'Plan olduğu gibi.',
-  minimal: 'Sadece temel bloklar kalır: pelvis, sabah yürüyüşü, 1 saat DSA. Hiç yapmamaktan iyidir.',
+  minimal: 'Sadece temel bloklar kalır: pelvis, 1 saat algo (sadece tekrarlar), 1 saat build, yemekler, şekerleme, 30 dk yürüyüş. Hiç yapmamaktan iyidir.',
   off: 'Hiç bildirim yok, odak kilidi yok, takipte sayılmaz. Seriyi de bozmaz.',
 };
 
@@ -78,6 +79,8 @@ export function TodayScreen({ now }: { now: number }) {
         />
         <p className="muted" style={{ margin: 0 }}>{MODE_HINT[mode]}</p>
       </div>
+
+      {which === 'today' && <BodyCard date={date} />}
 
       {off ? (
         <p className="muted">Bu gün plan dinleniyor. Normal'e alırsan bloklar ve bildirimler geri gelir.</p>

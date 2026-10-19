@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { msAt } from '../lib/time';
-import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './defaults';
+import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './legacy.fixture';
 import { buildEvents } from './notify';
 import { pomodoroAt, pomodoroLengths, pomodoroPhases, resolveDay } from './schedule';
 import type { BlockType } from './types';

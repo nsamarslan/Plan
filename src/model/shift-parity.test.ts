@@ -4,7 +4,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { msAt } from '../lib/time';
-import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './defaults';
+import { DEFAULT_TYPES, defaultSettings, defaultTemplate } from './legacy.fixture';
 import { buildEvents, buildFocusWindows, buildSlots, type PlanInput } from './notify';
 import { emptyDay, extendItem, resolveDay, snoozeItem, startItem } from './schedule';
 import type { DayDoc } from './types';

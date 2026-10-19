@@ -7,6 +7,8 @@ import { getState, getDay, subscribe, updateDay } from '../store/store';
 import { getQuickSession, subscribeQuick } from '../store/quick';
 import { pullNow } from '../store/sync';
 import { quickEvents, quickWindows } from '../model/quick';
+import { restEvents } from '../model/workout';
+import { getRest, subscribeRest } from '../store/rest';
 import { toast } from './toast';
 
 // Two weeks: the phone keeps notifying even if the app isn't opened for a while.
@@ -43,6 +45,12 @@ async function push() {
     events.sort((a, b) => a.at - b.at);
     windows.push(...quickWindows(quick, input.settings, input.nowMs));
     windows.sort((a, b) => a.start - b.start);
+  }
+  // Rest between sets: one cue with sound when it's over.
+  const rest = restEvents(getRest(), input.nowMs);
+  if (rest.length) {
+    events.push(...rest);
+    events.sort((a, b) => a.at - b.at);
   }
   if (isNative) {
     const slots = buildSlots(input);
@@ -126,6 +134,7 @@ export function startScheduler() {
   };
   subscribe(soon);
   subscribeQuick(soon);
+  subscribeRest(soon);
   void push();
   // Re-plan every minute so events roll forward past midnight.
   setInterval(() => void push(), 60_000);
