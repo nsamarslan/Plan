@@ -256,6 +256,7 @@ function SyncCard() {
   const cfg = getSupabaseConfig();
   const [url, setUrl] = useState(cfg?.url ?? '');
   const [key, setKey] = useState(cfg?.key ?? '');
+  const [editing, setEditing] = useState(false);
 
   return (
     <div className="card">
@@ -265,24 +266,27 @@ function SyncCard() {
           {st.state === 'syncing' ? 'Senkronlanıyor…' : st.state === 'error' ? 'Hata' : st.user ? 'Açık' : ''}
         </span>
       </div>
-      {!st.configured && (
+      {(!st.configured || editing) && (
         <>
           <p className="muted">Supabase projesinin adresini ve "anon public" anahtarını gir (README'de 5 adımlık kurulum var).</p>
           <input className="input" placeholder="https://xxxx.supabase.co" value={url} onChange={(e) => setUrl(e.target.value)} />
           <input className="input" placeholder="anon public key" value={key} onChange={(e) => setKey(e.target.value)} />
+          {!st.configured && st.error && <p className="perm-no">{st.error}</p>}
           <button
             className="btn btn-primary"
             onClick={() => {
               // Stored on this device only, so it can't overwrite the other device's settings.
               setSupabaseConfig(url, key);
-              initSync();
+              // Replacing the build's values: the running client still has the old ones.
+              if (st.configured) location.reload();
+              else initSync();
             }}
           >
             Kaydet
           </button>
         </>
       )}
-      {st.configured && !st.user && (
+      {st.configured && !st.user && !editing && (
         <form
           className="field"
           onSubmit={async (e) => {
@@ -329,6 +333,11 @@ function SyncCard() {
           }}
         >
           Supabase ayarını sıfırla
+        </button>
+      )}
+      {st.configured && cfg?.fromBuild && !st.user && !editing && (
+        <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
+          Supabase adresini değiştir
         </button>
       )}
     </div>

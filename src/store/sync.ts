@@ -73,27 +73,44 @@ export interface SupabaseConfig {
   fromBuild: boolean;
 }
 
+/**
+ * The client adds /auth/v1, /rest/v1 itself, so only the origin may stay:
+ * "xxxx.supabase.co/rest/v1/" → "https://xxxx.supabase.co". With the path left
+ * in, every request fails with "Invalid path specified in request URL".
+ */
+export function normalizeSupabaseUrl(raw: string): string {
+  const s = raw.trim();
+  if (!s) return '';
+  try {
+    return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`).origin;
+  } catch {
+    return s;
+  }
+}
+
 export function getSupabaseConfig(): SupabaseConfig | null {
-  const envUrl = import.meta.env.VITE_SUPABASE_URL;
-  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (envUrl && envKey) return { url: envUrl, key: envKey, fromBuild: true };
+  // This device's own choice first, so wrong values baked into a build can be fixed in the app.
   try {
     const saved = JSON.parse(ls.get(CONFIG_KEY) ?? 'null') as { url?: string; key?: string } | null;
-    if (saved?.url && saved.key) return { url: saved.url, key: saved.key, fromBuild: false };
+    if (saved?.url && saved.key) return { url: normalizeSupabaseUrl(saved.url), key: saved.key, fromBuild: false };
   } catch {
     /* fall through */
   }
+  const envUrl = import.meta.env.VITE_SUPABASE_URL;
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (envUrl && envKey) return { url: normalizeSupabaseUrl(envUrl), key: envKey.trim(), fromBuild: true };
   // Older versions kept these inside the synced settings document.
   const s = getState().settings;
   if (s.supabaseUrl && s.supabaseKey) {
     setSupabaseConfig(s.supabaseUrl, s.supabaseKey);
-    return { url: s.supabaseUrl, key: s.supabaseKey, fromBuild: false };
+    return { url: normalizeSupabaseUrl(s.supabaseUrl), key: s.supabaseKey, fromBuild: false };
   }
   return null;
 }
 
 export function setSupabaseConfig(url: string, key: string) {
-  ls.set(CONFIG_KEY, JSON.stringify({ url: url.trim(), key: key.trim() }));
+  // Keys never contain whitespace; a key pasted on a phone may carry line breaks.
+  ls.set(CONFIG_KEY, JSON.stringify({ url: normalizeSupabaseUrl(url), key: key.replace(/\s+/g, '') }));
 }
 
 export function clearSupabaseConfig() {

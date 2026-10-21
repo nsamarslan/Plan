@@ -116,6 +116,7 @@ beforeEach(() => {
   server.user = null;
   server.failUpserts = 0;
   server.signOutScopes = [];
+  vi.unstubAllEnvs();
   for (const k of Object.keys(listeners)) delete listeners[k];
   installGlobals();
 });
@@ -166,6 +167,25 @@ describe('sync', () => {
     sync.setSupabaseConfig('https://x.supabase.co', 'anon');
     expect(store.getState().stamps.settings).toBe(0);
     expect(sync.getSupabaseConfig()?.url).toBe('https://x.supabase.co');
+  });
+
+  it('a project URL pasted with the API path still works', async () => {
+    const { sync } = await boot();
+    sync.setSupabaseConfig(' gqgj.supabase.co/rest/v1/ ', 'eyJ\nabc ');
+    expect(sync.getSupabaseConfig()).toEqual({ url: 'https://gqgj.supabase.co', key: 'eyJabc', fromBuild: false });
+    expect(sync.normalizeSupabaseUrl('https://GQGJ.supabase.co/')).toBe('https://gqgj.supabase.co');
+    expect(sync.normalizeSupabaseUrl('http://localhost:54321/auth/v1')).toBe('http://localhost:54321');
+  });
+
+  it("build values lose the API path, and this device's own values replace them", async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://gqgj.supabase.co/rest/v1/');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'build-key');
+    const { sync } = await boot();
+    expect(sync.getSupabaseConfig()).toEqual({ url: 'https://gqgj.supabase.co', key: 'build-key', fromBuild: true });
+    sync.setSupabaseConfig('https://other.supabase.co', 'mine');
+    expect(sync.getSupabaseConfig()).toEqual({ url: 'https://other.supabase.co', key: 'mine', fromBuild: false });
+    sync.clearSupabaseConfig();
+    expect(sync.getSupabaseConfig()?.fromBuild).toBe(true);
   });
 
   it('new4: signing out only signs out this device', async () => {

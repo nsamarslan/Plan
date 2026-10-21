@@ -61,10 +61,11 @@ Ekim 2026 çalışma planı (Obsidian'daki ana hub). Kalkış 06:30, yatış 23:
 1. [supabase.com](https://supabase.com) → ücretsiz hesap → **New project**.
 2. **SQL Editor** → `supabase/schema.sql` dosyasının içeriğini yapıştır → **Run**. Daha önce çalıştırdıysan yeni sürümü de aynı şekilde çalıştır; tekrar çalıştırmak güvenli.
 3. **Authentication → Sign In / Providers → Email**: "Confirm email" seçeneğini kapat. Böylece onay maili beklemeden giriş yaparsın.
-4. **Project Settings → API**: `Project URL` ve `anon public` anahtarını kopyala.
+4. **Project Settings → API**: `Project URL` ve `anon public` anahtarını kopyala. Adres `https://xxxx.supabase.co` gibidir. Sonunda `/rest/v1/` varsa da olur, uygulama onu siler.
 5. İki yoldan birini seç:
    - **Kolay:** Uygulamada Ayarlar → Senkron'a yapıştır. Bunu telefonda ve web'de bir kez yap. Bu bilgi sadece o cihazda saklanır, diğer cihazın ayarlarını değiştirmez.
-   - **Kalıcı:** GitHub → Settings → Secrets and variables → Actions → **Variables** sekmesine `SUPABASE_URL` ve `SUPABASE_ANON_KEY` ekle. Bundan sonraki her derleme bu bilgilerle gelir.
+   - **Kalıcı:** GitHub → Settings → Secrets and variables → Actions → **Variables** sekmesine `SUPABASE_URL` ve `SUPABASE_ANON_KEY` ekle. Bundan sonraki her derleme bu bilgilerle gelir. Değerler derlenirken APK'nın ve sitenin içine yazılır. Değişkeni değiştirir ya da silersen **Actions → Android APK** ve **Web (GitHub Pages)** iş akışlarını yeniden çalıştır, sonra yeni APK'yı kur. Eski APK eski değerlerle kalır.
+   - Derlemeden gelen değerler yanlışsa: uygulamada Ayarlar → Senkron → **Supabase adresini değiştir**. Bu cihazda girdiğin değerler derlemedekilerin yerine geçer.
 
 Sonra iki cihazda da aynı e-posta ve şifreyle giriş yap.
 
